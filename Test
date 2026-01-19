@@ -19,6 +19,8 @@ local Window = Starlight:CreateWindow({
 
 local TabSection = Window:CreateTabSection("main")
 
+local TabSection = Window:CreateTabSection("esp")
+
 local TabSection = Window:CreateTabSection("misc")
 
 Groupbox:CreateButton({

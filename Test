@@ -1,0 +1,32 @@
+local Starlight = loadstring(game:HttpGet("https://raw.nebulasoftworks.xyz/starlight"))()  
+
+local NebulaIcons = loadstring(game:HttpGet("https://raw.nebulasoftworks.xyz/nebula-icon-library-loader"))()
+
+local Window = Starlight:CreateWindow({
+    Name = "tokai",
+    Subtitle = "v1.0",
+    Icon = 123456789,
+
+    LoadingSettings = {
+        Title = "tokaiHub",
+        Subtitle = "wellcom to tokaiHub",
+    },
+
+    FileSettings = {
+        ConfigFolder = "MyScript"
+    },
+})
+
+local TabSection = Window:CreateTabSection("main")
+
+local TabSection = Window:CreateTabSection("misc")
+
+Groupbox:CreateButton({
+    Name = "Helicopter keyboard for phones!",
+    Icon = NebulaIcons:GetIcon('check', 'Material'),
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/longhazem/BRM5-tokaihub/refs/heads/main/Tokai%20Hub%20keyboard%20Helicopter"))()
+    end,
+}, "INDEX")
+
+local TabSection = Window:CreateTabSection("settings")

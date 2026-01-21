@@ -3,18 +3,20 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 local TweenService = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
+local StarterGui = game:GetService("StarterGui")
 
 local buttonsConfig = {
     {Key = "Q", Label = "Q", Position = UDim2.new(0.1, 0, 0.45, 0)},
     {Key = "E", Label = "E", Position = UDim2.new(0.25, 0, 0.45, 0)},
     {Key = "LeftShift", Label = "Shift", Position = UDim2.new(0.8, 0, 0.65, 0)},
-    {Key = "Space", Label = "space", Position = UDim2.new(0.8, 0, 0.45, 0)},
+    {Key = "Space", Label = "Space", Position = UDim2.new(0.8, 0, 0.45, 0)},
     {Key = "X", Label = "X", Position = UDim2.new(0.9, 0, 0.4, 0)},
 }
 
 local parent = pcall(function() return CoreGui end) and CoreGui or Players.LocalPlayer:WaitForChild("PlayerGui")
+
 local screengui = Instance.new("ScreenGui")
-screengui.Name = "TOKAI hub keyboard brm5 pilot "
+screengui.Name = "TOKAI hub keyboard brm5 pilot"
 screengui.ResetOnSpawn = false
 screengui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screengui.Parent = parent
@@ -134,19 +136,28 @@ local function createKeyButton(config)
         TweenService:Create(frame, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(20, 20, 20)}):Play()
         VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
     end)
+    
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(frame, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(20, 20, 20)}):Play()
+    end)
 end
 
 for _, cfg in ipairs(buttonsConfig) do
     createKeyButton(cfg)
 end
 
-game:GetService("StarterGui"):SetCore("SendNotification", {
-    Title = "Keyboard,MADE BY TOKAI";
-    Text = "Loade done.!";
-    Duration = 5;
+task.spawn(function()
+    local function notify(title, text, duration)
+        pcall(function()
+            StarterGui:SetCore("SendNotification", {
+                Title = title;
+                Text = text;
+                Duration = duration or 5;
+            })
+        end)
+    end
 
-game:GetService("StarterGui"):SetCore("SendNotification", {
-    Title = "Keyboard,MADE BY TOKAI";
-    Text = "Discord link: https://discord.gg/nn783R2fK2";
-    Duration = 5;
-})
+    notify("TOKAI Hub", "Script Loaded Successfully!", 5)
+    task.wait(1)
+    notify("Support", "Discord: discord.gg/nn783R2fK2", 10)
+end)

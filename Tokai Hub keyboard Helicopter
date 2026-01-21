@@ -141,7 +141,8 @@ for _, cfg in ipairs(buttonsConfig) do
 end
 
 game:GetService("StarterGui"):SetCore("SendNotification", {
-    Title = "Mini Keyboard";
-    Text = "Loaded!";
-    Duration = 3;
+    Title = "Keyboard,MADE BY TOKAI";
+    Text = "Loade done.!";
+    Text = "Discord link: https://discord.gg/nn783R2fK2";
+    Duration = 5;
 })

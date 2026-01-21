@@ -143,6 +143,10 @@ end
 game:GetService("StarterGui"):SetCore("SendNotification", {
     Title = "Keyboard,MADE BY TOKAI";
     Text = "Loade done.!";
+    Duration = 5;
+})
+game:GetService("StarterGui"):SetCore("SendNotification", {
+    Title = "Keyboard,MADE BY TOKAI";
     Text = "Discord link: https://discord.gg/nn783R2fK2";
     Duration = 5;
 })

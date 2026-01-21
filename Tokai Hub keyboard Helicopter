@@ -8,7 +8,7 @@ local buttonsConfig = {
     {Key = "Q", Label = "Q", Position = UDim2.new(0.1, 0, 0.45, 0)},
     {Key = "E", Label = "E", Position = UDim2.new(0.25, 0, 0.45, 0)},
     {Key = "LeftShift", Label = "Shift", Position = UDim2.new(0.8, 0, 0.65, 0)},
-    {Key = "Space", Label = "space", Position = UDim2.new(0.8, 0, 0.55, 0)},
+    {Key = "Space", Label = "space", Position = UDim2.new(0.8, 0, 0.45, 0)},
     {Key = "X", Label = "X", Position = UDim2.new(0.9, 0, 0.4, 0)},
 }
 

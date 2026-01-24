@@ -163,5 +163,5 @@ task.spawn(function()
 
     notify("TOKAI Hub", "Script Loaded Successfully!", 5)
     task.wait(1)
-    notify("Support", "Discord: discord.gg/nn783R2fK2", 10)
+    notify("Support", "Discord: discord.gg/nn783R2fK2", 60)
 end)

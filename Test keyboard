@@ -1,0 +1,72 @@
+local UIS = game:GetService("UserInputService")
+local VIM = game:GetService("VirtualInputManager")
+
+-- 1. TẠO GIAO DIỆN
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CustomController"
+screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+
+-- Khung chứa chính (Kéo cái này để di chuyển cả bộ)
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 110, 0, 120)
+mainFrame.Position = UDim2.new(0.1, 0, 0.5, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BackgroundTransparency = 0.3
+mainFrame.Active = true
+mainFrame.Draggable = true -- Có thể kéo thả
+mainFrame.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner", mainFrame)
+
+-- 2. NÚT W (ĐIỀU KHIỂN THỦ CÔNG)
+local btnW = Instance.new("TextButton")
+btnW.Size = UDim2.new(0, 90, 0, 40)
+btnW.Position = UDim2.new(0, 10, 0, 15)
+btnW.Text = "W (Giữ)"
+btnW.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+btnW.TextColor3 = Color3.new(1, 1, 1)
+btnW.Parent = mainFrame
+
+-- 3. NÚT V (AUTO ĐÈ)
+local btnV = Instance.new("TextButton")
+btnV.Size = UDim2.new(0, 90, 0, 40)
+btnV.Position = UDim2.new(0, 10, 0, 65)
+btnV.Text = "V: TẮT"
+btnV.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+btnV.TextColor3 = Color3.new(1, 1, 1)
+btnV.Parent = mainFrame
+
+--- LOGIC ĐIỀU KHIỂN ---
+
+-- Logic cho nút W (Chạm giữ là đi, thả là dừng)
+btnW.MouseButton1Down:Connect(function()
+    btnW.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    btnW.TextColor3 = Color3.new(0, 0, 0)
+    VIM:SendKeyEvent(true, Enum.KeyCode.W, false, game)
+end)
+
+btnW.MouseButton1Up:Connect(function()
+    btnW.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    btnW.TextColor3 = Color3.new(1, 1, 1)
+    VIM:SendKeyEvent(false, Enum.KeyCode.W, false, game)
+end)
+
+-- Logic cho nút V (Bấm để bật/tắt chế độ đè phím)
+local autoV = false
+btnV.MouseButton1Click:Connect(function()
+    autoV = not autoV
+    if autoV then
+        btnV.Text = "V: ĐANG ĐÈ"
+        btnV.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+        task.spawn(function()
+            while autoV do
+                VIM:SendKeyEvent(true, Enum.KeyCode.V, false, game)
+                task.wait(0.05)
+            end
+            VIM:SendKeyEvent(false, Enum.KeyCode.V, false, game)
+        end)
+    else
+        btnV.Text = "V: TẮT"
+        btnV.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+    end
+end)

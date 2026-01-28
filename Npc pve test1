@@ -1,0 +1,184 @@
+-- BRM5 v6.5 Ultra-Fast NPC Hitbox (Custom Filter Edition)
+-- Hướng dẫn: Dùng Dex tìm tên NPC rồi điền vào bảng NPC_NAMES bên dưới
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local Camera = Workspace.CurrentCamera
+
+local LocalPlayer = Players.LocalPlayer
+
+-- BẢNG TÊN NPC (Sau khi bạn dùng Dex lọc, hãy điền tên vào đây)
+local NPC_NAMES = {
+    "Male",         -- NPC loại 1
+    "Female",       -- NPC loại 2 (Ví dụ)
+    "EnemyNPC"      -- Thêm bao nhiêu tùy ý
+}
+
+-- Cấu hình Hitbox
+local HITBOX_NAME = "Red_Hitbox_Fast"
+local HITBOX_SIZE = 0.35 
+local wallEnabled = false 
+local aimEnabled = false
+local smoothing = 92
+local holdingRightClick = false
+
+-- GIAO DIỆN (GUI)
+local gui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+gui.Name = "FastScanGUI_V2"
+gui.ResetOnSpawn = false
+
+-- Menu nhỏ (Toggle)
+local miniMenu = Instance.new("Frame", gui)
+miniMenu.Size = UDim2.new(0, 40, 0, 40)
+miniMenu.Position = UDim2.new(0, 10, 0, 200)
+miniMenu.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+miniMenu.Active = true
+miniMenu.Draggable = true 
+Instance.new("UICorner", miniMenu).CornerRadius = UDim.new(1, 0)
+
+local miniBtn = Instance.new("TextButton", miniMenu)
+miniBtn.Size = UDim2.new(1, 0, 1, 0)
+miniBtn.Text = "🎯"
+miniBtn.TextSize = 18
+miniBtn.BackgroundTransparency = 1
+miniBtn.TextColor3 = Color3.new(1, 1, 1)
+
+-- Menu chính
+local mainFrame = Instance.new("Frame", gui)
+mainFrame.Size = UDim2.new(0, 220, 0, 250)
+mainFrame.Position = UDim2.new(0.5, -110, 0.5, -125)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+mainFrame.Visible = false
+mainFrame.Active = true
+mainFrame.Draggable = true
+Instance.new("UICorner", mainFrame)
+
+miniBtn.MouseButton1Click:Connect(function()
+    mainFrame.Visible = not mainFrame.Visible
+end)
+
+local function createToggle(text, y)
+    local btn = Instance.new("TextButton", mainFrame)
+    btn.Size = UDim2.new(0.9, 0, 0, 45)
+    btn.Position = UDim2.new(0.05, 0, 0, y)
+    btn.Text = text .. ": OFF"
+    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 16
+    Instance.new("UICorner", btn)
+    return btn
+end
+
+local wallBtn = createToggle("Wall (ESP)", 60)
+local aimBtn = createToggle("Aimbot", 115)
+
+-- HÀM KIỂM TRA NPC CÓ TRONG DANH SÁCH KHÔNG
+local function isTargetNPC(model)
+    for _, name in ipairs(NPC_NAMES) do
+        if model.Name == name then
+            return true
+        end
+    end
+    return false
+end
+
+-- LOGIC TẠO HITBOX
+local function applyHitbox(model)
+    if not model:IsA("Model") or model == LocalPlayer.Character then return end
+    if not isTargetNPC(model) then return end -- Chỉ áp dụng cho NPC trong list
+
+    local head = model:FindFirstChild("Head")
+    if head and head:IsA("BasePart") and not head:FindFirstChild(HITBOX_NAME) then
+        local hitbox = Instance.new("Part")
+        hitbox.Name = HITBOX_NAME
+        hitbox.Size = Vector3.new(HITBOX_SIZE, HITBOX_SIZE, HITBOX_SIZE)
+        hitbox.Color = Color3.fromRGB(255, 0, 0)
+        hitbox.Transparency = 0.5
+        hitbox.Material = Enum.Material.Neon
+        hitbox.CanCollide = false
+        hitbox.CanQuery = false
+        hitbox.Parent = head
+        
+        local weld = Instance.new("WeldConstraint", hitbox)
+        weld.Part0 = head
+        weld.Part1 = hitbox
+        hitbox.CFrame = head.CFrame * CFrame.new(0, 0, -0.1)
+
+        local adorn = Instance.new("BoxHandleAdornment", hitbox)
+        adorn.Name = "FastBox"
+        adorn.Size = hitbox.Size * 1.1
+        adorn.Adornee = hitbox
+        adorn.AlwaysOnTop = true
+        adorn.Color3 = Color3.fromRGB(255, 0, 0)
+        adorn.Transparency = wallEnabled and 0.3 or 1
+        adorn.Parent = hitbox
+    end
+end
+
+-- QUÉT SIÊU TỐC
+RunService.Heartbeat:Connect(function()
+    for _, obj in ipairs(Workspace:GetChildren()) do
+        applyHitbox(obj)
+    end
+end)
+
+Workspace.ChildAdded:Connect(function(child)
+    applyHitbox(child)
+end)
+
+-- ĐIỀU KHIỂN
+wallBtn.MouseButton1Click:Connect(function()
+    wallEnabled = not wallEnabled
+    wallBtn.Text = "Wall (ESP): " .. (wallEnabled and "ON" or "OFF")
+    wallBtn.BackgroundColor3 = wallEnabled and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
+    
+    for _, v in ipairs(Workspace:GetDescendants()) do
+        if v.Name == "FastBox" then
+            v.Transparency = wallEnabled and 0.3 or 1
+        end
+    end
+end)
+
+aimBtn.MouseButton1Click:Connect(function()
+    aimEnabled = not aimEnabled
+    aimBtn.Text = "Aimbot: " .. (aimEnabled and "ON" or "OFF")
+    aimBtn.BackgroundColor3 = aimEnabled and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
+end)
+
+UserInputService.InputBegan:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton2 then holdingRightClick = true end
+end)
+UserInputService.InputEnded:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton2 then holdingRightClick = false end
+end)
+
+-- AIM LOGIC
+RunService.RenderStepped:Connect(function()
+    if aimEnabled and holdingRightClick then
+        local targetPos = nil
+        local shortestDist = math.huge
+        local mousePos = UserInputService:GetMouseLocation()
+        
+        for _, v in ipairs(Workspace:GetDescendants()) do
+            if v.Name == HITBOX_NAME then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(v.Position)
+                if onScreen then
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    if dist < shortestDist then
+                        shortestDist = dist
+                        targetPos = screenPos
+                    end
+                end
+            end
+        end
+        
+        if targetPos then
+            local delta = (Vector2.new(targetPos.X, targetPos.Y) - mousePos)
+            mousemoverel(delta.X * (1 - smoothing/100), delta.Y * (1 - shortestDist/5000 * (1 - smoothing/100))) -- Dynamic smooth
+            mousemoverel(delta.X * (1 - smoothing/100), delta.Y * (1 - smoothing/100))
+        end
+    end
+end)

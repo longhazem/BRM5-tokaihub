@@ -1,184 +1,431 @@
--- BRM5 v6.5 Ultra-Fast NPC Hitbox (Custom Filter Edition)
--- Hướng dẫn: Dùng Dex tìm tên NPC rồi điền vào bảng NPC_NAMES bên dưới
+-- BRM5 v6.5 by dexter (Modified: Multi-Target + Hitbox Expander)
+-- Credits to ryknuq and their overvoltage script.
 
+-- Obtaining essential Roblox services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService")
 local Workspace = game:GetService("Workspace")
 local Camera = Workspace.CurrentCamera
 
+-- Local variables for player and configuration
 local LocalPlayer = Players.LocalPlayer
+local configFile = "Dexter_Config_v2.txt"
 
--- BẢNG TÊN NPC (Sau khi bạn dùng Dex lọc, hãy điền tên vào đây)
-local NPC_NAMES = {
-    "Male",         -- NPC loại 1
-    "Female",       -- NPC loại 2 (Ví dụ)
-    "EnemyNPC"      -- Thêm bao nhiêu tùy ý
-}
+-- [[ CẤU HÌNH MỤC TIÊU ]] --
+-- Danh sách tên các mục tiêu cần ESP/Aim/Hitbox
+local TARGET_NAMES = {"Male", "npc male", "zombie"} 
 
--- Cấu hình Hitbox
-local HITBOX_NAME = "Red_Hitbox_Fast"
-local HITBOX_SIZE = 0.35 
+local TARGET_PART = "Head" -- Phần cơ thể để Aim vào
+local REQUIRED_CHILD = "Wall_Box" 
+local DEADZONE = 1.5 
+
+-- Tables and state variables
+local trackedParts = {} 
+local wallConnections = {} 
 local wallEnabled = false 
-local aimEnabled = false
-local smoothing = 92
-local holdingRightClick = false
+local guiVisible = true 
+local isUnloaded = false 
 
--- GIAO DIỆN (GUI)
-local gui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-gui.Name = "FastScanGUI_V2"
-gui.ResetOnSpawn = false
+-- configuration variables
+local aimEnabled = false 
+local smoothing = 95 
+local holdingRightClick = false 
+local fovEnabled = false 
+local fovRadius = 100 
+-- [NEW] Biến cho Hitbox
+local hitboxEnabled = false
+local hitboxSize = 5 -- Kích thước mặc định của đầu khi hack
 
--- Menu nhỏ (Toggle)
-local miniMenu = Instance.new("Frame", gui)
-miniMenu.Size = UDim2.new(0, 40, 0, 40)
-miniMenu.Position = UDim2.new(0, 10, 0, 200)
-miniMenu.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-miniMenu.Active = true
-miniMenu.Draggable = true 
-Instance.new("UICorner", miniMenu).CornerRadius = UDim.new(1, 0)
+-- Creation of the FOV circle
+local fovCircle = Drawing.new("Circle")
+fovCircle.Color = Color3.fromRGB(0, 255, 0)
+fovCircle.Thickness = 2
+fovCircle.Filled = false
+fovCircle.Visible = false
 
-local miniBtn = Instance.new("TextButton", miniMenu)
-miniBtn.Size = UDim2.new(1, 0, 1, 0)
-miniBtn.Text = "🎯"
-miniBtn.TextSize = 18
-miniBtn.BackgroundTransparency = 1
-miniBtn.TextColor3 = Color3.new(1, 1, 1)
-
--- Menu chính
-local mainFrame = Instance.new("Frame", gui)
-mainFrame.Size = UDim2.new(0, 220, 0, 250)
-mainFrame.Position = UDim2.new(0.5, -110, 0.5, -125)
-mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-mainFrame.Visible = false
-mainFrame.Active = true
-mainFrame.Draggable = true
-Instance.new("UICorner", mainFrame)
-
-miniBtn.MouseButton1Click:Connect(function()
-    mainFrame.Visible = not mainFrame.Visible
-end)
-
-local function createToggle(text, y)
-    local btn = Instance.new("TextButton", mainFrame)
-    btn.Size = UDim2.new(0.9, 0, 0, 45)
-    btn.Position = UDim2.new(0.05, 0, 0, y)
-    btn.Text = text .. ": OFF"
-    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.Font = Enum.Font.SourceSansBold
-    btn.TextSize = 16
-    Instance.new("UICorner", btn)
-    return btn
+-- Function to save the current configuration
+local function saveConfig(config)
+    if writefile then
+        writefile(configFile, HttpService:JSONEncode({
+            wall = config.wall,
+            aim = config.aim,
+            fovEnabled = config.fovEnabled,
+            fovRadius = config.fovRadius,
+            smoothing = config.smoothing,
+            hitboxEnabled = config.hitboxEnabled, -- Lưu cấu hình hitbox
+            hitboxSize = config.hitboxSize
+        }))
+    end
 end
 
-local wallBtn = createToggle("Wall (ESP)", 60)
-local aimBtn = createToggle("Aimbot", 115)
-
--- HÀM KIỂM TRA NPC CÓ TRONG DANH SÁCH KHÔNG
-local function isTargetNPC(model)
-    for _, name in ipairs(NPC_NAMES) do
-        if model.Name == name then
-            return true
+-- Function to load the configuration
+local function loadConfig()
+    if isfile and isfile(configFile) and readfile then
+        local success, data = pcall(function()
+            return HttpService:JSONDecode(readfile(configFile))
+        end)
+        if success then
+            return {
+                wall = data.wall or false,
+                aim = data.aim or false,
+                fovEnabled = data.fovEnabled or false,
+                fovRadius = data.fovRadius or 100,
+                smoothing = data.smoothing or 95,
+                hitboxEnabled = data.hitboxEnabled or false,
+                hitboxSize = data.hitboxSize or 5
+            }
         end
     end
-    return false
+    return {
+        wall = false,
+        aim = false,
+        fovEnabled = false,
+        fovRadius = 100,
+        smoothing = 95,
+        hitboxEnabled = false,
+        hitboxSize = 5
+    }
 end
 
--- LOGIC TẠO HITBOX
-local function applyHitbox(model)
-    if not model:IsA("Model") or model == LocalPlayer.Character then return end
-    if not isTargetNPC(model) then return end -- Chỉ áp dụng cho NPC trong list
+local currentConfig = loadConfig()
+wallEnabled = currentConfig.wall
+aimEnabled = currentConfig.aim
+fovEnabled = currentConfig.fovEnabled
+fovRadius = currentConfig.fovRadius
+smoothing = currentConfig.smoothing
+hitboxEnabled = currentConfig.hitboxEnabled
+hitboxSize = currentConfig.hitboxSize
 
-    local head = model:FindFirstChild("Head")
-    if head and head:IsA("BasePart") and not head:FindFirstChild(HITBOX_NAME) then
-        local hitbox = Instance.new("Part")
-        hitbox.Name = HITBOX_NAME
-        hitbox.Size = Vector3.new(HITBOX_SIZE, HITBOX_SIZE, HITBOX_SIZE)
-        hitbox.Color = Color3.fromRGB(255, 0, 0)
-        hitbox.Transparency = 0.5
-        hitbox.Material = Enum.Material.Neon
-        hitbox.CanCollide = false
-        hitbox.CanQuery = false
-        hitbox.Parent = head
-        
-        local weld = Instance.new("WeldConstraint", hitbox)
-        weld.Part0 = head
-        weld.Part1 = hitbox
-        hitbox.CFrame = head.CFrame * CFrame.new(0, 0, -0.1)
+-- Function to destroy all Wall boxes
+local function destroyAllBoxes()
+    for part, _ in pairs(trackedParts) do
+        if part and part.Parent and part:FindFirstChild("Wall_Box") then
+            part.Wall_Box:Destroy()
+        end
+    end
+    trackedParts = {}
+end
 
-        local adorn = Instance.new("BoxHandleAdornment", hitbox)
-        adorn.Name = "FastBox"
-        adorn.Size = hitbox.Size * 1.1
-        adorn.Adornee = hitbox
-        adorn.AlwaysOnTop = true
-        adorn.Color3 = Color3.fromRGB(255, 0, 0)
-        adorn.Transparency = wallEnabled and 0.3 or 1
-        adorn.Parent = hitbox
+local function createBoxForPart(part)
+    if isUnloaded or not part or part.Parent == nil or part:FindFirstChild("Wall_Box") then return end
+    task.wait(0.5)
+    if not part or not part.Parent or part:FindFirstChild("Wall_Box") then return end
+
+    local box = Instance.new("BoxHandleAdornment")
+    box.Name = "Wall_Box"
+    box.Size = part.Size + Vector3.new(0.1, 0.1, 0.1)
+    box.Adornee = part
+    box.AlwaysOnTop = true
+    box.ZIndex = 5
+    box.Color3 = Color3.fromRGB(255, 0, 0) -- Màu đỏ cho địch
+    box.Transparency = 0.3
+    box.Parent = part
+
+    trackedParts[part] = true
+end
+
+-- Function to create boxes for all existing NPCs
+local function createBoxesForAllNPCs()
+    for _, npc in ipairs(Workspace:GetDescendants()) do
+        if npc:IsA("Model") and table.find(TARGET_NAMES, npc.Name) then
+            local head = npc:FindFirstChild(TARGET_PART)
+            if head then createBoxForPart(head) end
+        end
     end
 end
 
--- QUÉT SIÊU TỐC
-RunService.Heartbeat:Connect(function()
-    for _, obj in ipairs(Workspace:GetChildren()) do
-        applyHitbox(obj)
+-- [[ NEW FUNCTION: HITBOX EXPANDER ]] --
+local function updateHitboxes()
+    if not hitboxEnabled then return end
+    
+    for _, model in ipairs(Workspace:GetChildren()) do
+        if model:IsA("Model") and table.find(TARGET_NAMES, model.Name) then
+            local head = model:FindFirstChild("Head")
+            if head and head:IsA("BasePart") then
+                -- Thay đổi kích thước đầu
+                head.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
+                head.CanCollide = false -- Tắt va chạm để không bị kẹt
+                head.Transparency = 0.6 -- Làm mờ đi để dễ nhìn xuyên qua
+                
+                -- Xóa lưới hiển thị (Mesh) nếu có để nó thành khối vuông (dễ bắn hơn)
+                -- local mesh = head:FindFirstChildOfClass("SpecialMesh")
+                -- if mesh then mesh:Destroy() end 
+            end
+        end
     end
-end)
+end
 
-Workspace.ChildAdded:Connect(function(child)
-    applyHitbox(child)
-end)
+-- GUI Creation
+local gui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+gui.Name = "AimWallHitboxGUI"
+gui.ResetOnSpawn = false
+gui.DisplayOrder = 9999
 
--- ĐIỀU KHIỂN
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 260, 0, 480) -- Tăng chiều cao frame
+frame.Position = UDim2.new(0, 20, 0, 60)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.Active = true
+frame.Draggable = true
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+
+local function createButton(text, positionY, color)
+    local button = Instance.new("TextButton", frame)
+    button.Size = UDim2.new(0.9, 0, 0, 30)
+    button.Position = UDim2.new(0.05, 0, 0, positionY)
+    button.Text = text
+    button.BackgroundColor3 = color
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.Font = Enum.Font.GothamBold
+    button.TextSize = 16
+    Instance.new("UICorner", button).CornerRadius = UDim.new(0, 6)
+    return button
+end
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, 0, 0, 30)
+title.Text = "🎯 BRM5: Aim - Wall - Hitbox"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 18
+title.BackgroundTransparency = 1
+
+-- Wall Button
+local wallBtn = createButton(wallEnabled and "Wall: ON" or "Wall: OFF", 40, Color3.fromRGB(60, 60, 60))
 wallBtn.MouseButton1Click:Connect(function()
     wallEnabled = not wallEnabled
-    wallBtn.Text = "Wall (ESP): " .. (wallEnabled and "ON" or "OFF")
-    wallBtn.BackgroundColor3 = wallEnabled and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
-    
-    for _, v in ipairs(Workspace:GetDescendants()) do
-        if v.Name == "FastBox" then
-            v.Transparency = wallEnabled and 0.3 or 1
+    currentConfig.wall = wallEnabled
+    saveConfig(currentConfig)
+    wallBtn.Text = "Wall: " .. (wallEnabled and "ON" or "OFF")
+    wallBtn.BackgroundColor3 = wallEnabled and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(60, 60, 60)
+
+    for part, _ in pairs(trackedParts) do
+        local box = part:FindFirstChild("Wall_Box")
+        if box and box:IsA("BoxHandleAdornment") then
+            box.Transparency = wallEnabled and 0.3 or 1
         end
     end
 end)
 
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.KeyCode == Enum.KeyCode.Insert then
+        guiVisible = not guiVisible
+        frame.Visible = guiVisible
+        if not guiVisible then
+            UserInputService.MouseIconEnabled = false
+            UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+        end
+    end
+end)
+
+-- Aim Button
+local aimBtn = createButton("Aim: OFF", 80, Color3.fromRGB(60, 60, 60))
 aimBtn.MouseButton1Click:Connect(function()
     aimEnabled = not aimEnabled
-    aimBtn.Text = "Aimbot: " .. (aimEnabled and "ON" or "OFF")
-    aimBtn.BackgroundColor3 = aimEnabled and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
+    aimBtn.Text = "Aim: " .. (aimEnabled and "ON" or "OFF")
+    aimBtn.BackgroundColor3 = aimEnabled and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(60, 60, 60)
+    currentConfig.aim = aimEnabled
+    saveConfig(currentConfig)
 end)
 
-UserInputService.InputBegan:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton2 then holdingRightClick = true end
-end)
-UserInputService.InputEnded:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton2 then holdingRightClick = false end
+-- FOV Button
+local fovBtn = createButton("FOV: OFF", 120, Color3.fromRGB(60, 60, 60))
+fovBtn.MouseButton1Click:Connect(function()
+    fovEnabled = not fovEnabled
+    fovBtn.Text = "FOV: " .. (fovEnabled and "ON" or "OFF")
+    fovBtn.BackgroundColor3 = fovEnabled and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(60, 60, 60)
+    currentConfig.fovEnabled = fovEnabled
+    saveConfig(currentConfig)
 end)
 
--- AIM LOGIC
-RunService.RenderStepped:Connect(function()
-    if aimEnabled and holdingRightClick then
-        local targetPos = nil
-        local shortestDist = math.huge
-        local mousePos = UserInputService:GetMouseLocation()
-        
-        for _, v in ipairs(Workspace:GetDescendants()) do
-            if v.Name == HITBOX_NAME then
-                local screenPos, onScreen = Camera:WorldToViewportPoint(v.Position)
-                if onScreen then
-                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-                    if dist < shortestDist then
-                        shortestDist = dist
-                        targetPos = screenPos
+-- Unload Button
+local unloadBtn = createButton("Unload", 160, Color3.fromRGB(170, 0, 0))
+unloadBtn.MouseButton1Click:Connect(function()
+    isUnloaded = true
+    destroyAllBoxes()
+    fovCircle:Remove()
+    gui:Destroy()
+    for _, conn in ipairs(wallConnections) do pcall(function() conn:Disconnect() end) end
+    if mainRenderLoop then mainRenderLoop:Disconnect() end
+end)
+
+-- No Recoil Button
+local noRecoilBtn = createButton("No Recoil: OFF", 200, Color3.fromRGB(60, 60, 60))
+local noRecoilEnabled = false
+
+noRecoilBtn.MouseButton1Click:Connect(function()
+    noRecoilEnabled = not noRecoilEnabled
+    noRecoilBtn.Text = "No Recoil: " .. (noRecoilEnabled and "ON" or "OFF")
+    noRecoilBtn.BackgroundColor3 = noRecoilEnabled and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(60, 60, 60)
+    -- Logic No Recoil (giữ nguyên từ script cũ)
+    local weaponsFolder = game:GetService("ReplicatedStorage"):FindFirstChild("Shared") and game:GetService("ReplicatedStorage").Shared:FindFirstChild("Configs") and game:GetService("ReplicatedStorage").Shared.Configs:FindFirstChild("Weapon") and game:GetService("ReplicatedStorage").Shared.Configs.Weapon:FindFirstChild("Weapons_Player")
+    if weaponsFolder then
+        for _, platform in pairs(weaponsFolder:GetChildren()) do
+            if platform.Name:match("^Platform_") then
+                for _, weapon in pairs(platform:GetChildren()) do
+                    for _, child in pairs(weapon:GetChildren()) do
+                        if child:IsA("ModuleScript") and child.Name:match("^Receiver%.") then
+                            local success, receiver = pcall(require, child)
+                            if success and receiver and receiver.Config and receiver.Config.Tune then
+                                local tune = receiver.Config.Tune
+                                if noRecoilEnabled then
+                                    tune.Recoil_X = 0; tune.Recoil_Z = 0; tune.RecoilForce_Tap = 0; tune.RecoilForce_Impulse = 0; tune.Recoil_Range = Vector2.zero; tune.Recoil_Camera = 0; tune.RecoilAccelDamp_Crouch = Vector3.new(1, 1, 1); tune.RecoilAccelDamp_Prone = Vector3.new(1, 1, 1)
+                                end
+                            end
+                        end
                     end
                 end
             end
         end
-        
-        if targetPos then
-            local delta = (Vector2.new(targetPos.X, targetPos.Y) - mousePos)
-            mousemoverel(delta.X * (1 - smoothing/100), delta.Y * (1 - shortestDist/5000 * (1 - smoothing/100))) -- Dynamic smooth
-            mousemoverel(delta.X * (1 - smoothing/100), delta.Y * (1 - smoothing/100))
+    end
+end)
+
+-- [[ NEW BUTTON: HITBOX ]] --
+local hitboxBtn = createButton(hitboxEnabled and "Hitbox: ON" or "Hitbox: OFF", 240, Color3.fromRGB(60, 60, 60))
+hitboxBtn.MouseButton1Click:Connect(function()
+    hitboxEnabled = not hitboxEnabled
+    hitboxBtn.Text = "Hitbox: " .. (hitboxEnabled and "ON" or "OFF")
+    hitboxBtn.BackgroundColor3 = hitboxEnabled and Color3.fromRGB(255, 100, 0) or Color3.fromRGB(60, 60, 60) -- Màu cam
+    currentConfig.hitboxEnabled = hitboxEnabled
+    saveConfig(currentConfig)
+end)
+
+local function createSlider(labelText, min, max, defaultValue, positionY, callback)
+    local label = Instance.new("TextLabel", frame)
+    label.Size = UDim2.new(1, -20, 0, 20)
+    label.Position = UDim2.new(0, 10, 0, positionY)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 14
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Text = labelText .. ": " .. defaultValue
+
+    local sliderBack = Instance.new("Frame", frame)
+    sliderBack.Size = UDim2.new(0.9, 0, 0, 6)
+    sliderBack.Position = UDim2.new(0.05, 0, 0, positionY + 22)
+    sliderBack.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    Instance.new("UICorner", sliderBack).CornerRadius = UDim.new(0, 4)
+
+    local sliderButton = Instance.new("TextButton", sliderBack)
+    sliderButton.Size = UDim2.new(0, 10, 1.5, 0)
+    sliderButton.Position = UDim2.new((defaultValue - min) / (max - min), -5, 0, -2)
+    sliderButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+    sliderButton.Text = ""
+    Instance.new("UICorner", sliderButton).CornerRadius = UDim.new(1, 0)
+
+    local dragging = false
+    sliderButton.MouseButton1Down:Connect(function() dragging = true end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+    end)
+    RunService.RenderStepped:Connect(function()
+        if dragging then
+            local mouseXPosition = UserInputService:GetMouseLocation().X
+            local relativeXPosition = math.clamp((mouseXPosition - sliderBack.AbsolutePosition.X) / sliderBack.AbsoluteSize.X, 0, 1)
+            local value = math.floor((min + (max - min) * relativeXPosition) + 0.5)
+            sliderButton.Position = UDim2.new(relativeXPosition, -5, 0, -2)
+            label.Text = labelText .. ": " .. value
+            callback(value)
+        end
+    end)
+end
+
+-- Sliders (Adjusted Y positions)
+createSlider("FOV Radius", 0, 500, fovRadius, 280, function(value)
+    fovRadius = value
+    currentConfig.fovRadius = value
+    saveConfig(currentConfig)
+end)
+
+createSlider("Smoothing", 0, 100, smoothing, 320, function(value)
+    smoothing = value
+    currentConfig.smoothing = value
+    saveConfig(currentConfig)
+end)
+
+-- [[ NEW SLIDER: HITBOX SIZE ]] --
+createSlider("Hitbox Size", 1, 20, hitboxSize, 360, function(value)
+    hitboxSize = value
+    currentConfig.hitboxSize = value
+    saveConfig(currentConfig)
+end)
+
+local instructionNote = Instance.new("TextLabel", frame)
+instructionNote.Name = "InstructionNote"
+instructionNote.Size = UDim2.new(0.9, 0, 0, 60)
+instructionNote.Position = UDim2.new(0.05, 0, 0, 410)
+instructionNote.BackgroundTransparency = 1
+instructionNote.TextColor3 = Color3.fromRGB(230, 230, 230)
+instructionNote.Font = Enum.Font.Gotham
+instructionNote.TextSize = 12
+instructionNote.TextWrapped = true
+instructionNote.TextXAlignment = Enum.TextXAlignment.Left
+instructionNote.TextYAlignment = Enum.TextYAlignment.Top
+instructionNote.Text = "Hitbox Expander: Tăng kích thước đầu để dễ Headshot. Chỉnh Slider để to hơn."
+
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then holdingRightClick = true end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then holdingRightClick = false end
+end)
+
+local function getClosestValidHead()
+    local closestTarget, minDistance = nil, math.huge
+    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+    for _, model in ipairs(Workspace:GetChildren()) do
+        if model:IsA("Model") and table.find(TARGET_NAMES, model.Name) then
+            local head = model:FindFirstChild(TARGET_PART)
+            if head and head:IsA("BasePart") then
+                -- Kiểm tra Wall_Box để biết là địch
+                local box = head:FindFirstChild(REQUIRED_CHILD)
+                if box or wallEnabled == false then -- Nếu Wall tắt thì vẫn cho phép Aim nếu tìm thấy Model
+                     local targetScreenPosition, onScreen = Camera:WorldToViewportPoint(head.Position)
+                    if onScreen then
+                        local distance = (Vector2.new(targetScreenPosition.X, targetScreenPosition.Y) - screenCenter).Magnitude
+                        if distance < fovRadius and distance < minDistance then
+                            minDistance = distance
+                            closestTarget = head
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return closestTarget
+end
+
+-- Main Loop
+RunService.RenderStepped:Connect(function()
+    if isUnloaded then return end
+
+    -- Update FOV Circle
+    fovCircle.Visible = fovEnabled and aimEnabled
+    fovCircle.Radius = fovRadius
+    fovCircle.Position = UserInputService:GetMouseLocation()
+
+    -- Auto create boxes periodically
+    if wallEnabled then
+        createBoxesForAllNPCs()
+    end
+
+    -- [[ HITBOX LOGIC RUNNING ]] --
+    if hitboxEnabled then
+        updateHitboxes()
+    end
+
+    -- Aim Logic
+    if aimEnabled and holdingRightClick then
+        local target = getClosestValidHead()
+        if target then
+            local currentCFrame = Camera.CFrame
+            local targetCFrame = CFrame.new(Camera.CFrame.Position, target.Position)
+            Camera.CFrame = currentCFrame:Lerp(targetCFrame, (100 - smoothing) / 100 * 0.5) 
         end
     end
 end)

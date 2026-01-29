@@ -44,7 +44,7 @@ end
 
 -- Khởi tạo Window
 local Window = Rayfield:CreateWindow({
-    Name = "TOKAI-HUB-Zaibatsu+RP",
+    Name = "TOKAI-HUB-RBM5",
     Icon = 0,
     LoadingTitle = "TOKAI",
     LoadingSubtitle = "by LONGTOKAI",

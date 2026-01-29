@@ -1,6 +1,7 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
 local ESP_Active = false
 local TrackedModels = {}
 local DescendantConnection = nil
@@ -11,9 +12,16 @@ local NPC_Config = {
     ["Zombies"] = { Color = Color3.fromRGB(255, 0, 0) }
 }
 
+local function IsPlayer(model)
+    return Players:GetPlayerFromCharacter(model) ~= nil
+end
+
 local function CreateESP(model)
+    if IsPlayer(model) then return end
+    
     local config = NPC_Config[model.Name]
     if not config then return end
+    
     local head = model:WaitForChild("Head", 2)
     if not head or head:FindFirstChild("Universal_ESP_Box") then return end
 
@@ -40,11 +48,15 @@ local function ToggleESP(state)
     ESP_Active = state
     if state then
         for _, obj in ipairs(Workspace:GetDescendants()) do
-            if obj:IsA("Model") and NPC_Config[obj.Name] then CreateESP(obj) end
+            if obj:IsA("Model") and NPC_Config[obj.Name] then 
+                CreateESP(obj) 
+            end
         end
         DescendantConnection = Workspace.DescendantAdded:Connect(function(obj)
             if obj:IsA("Model") and NPC_Config[obj.Name] then
-                task.delay(0.5, function() if ESP_Active then CreateESP(obj) end end)
+                task.delay(0.5, function() 
+                    if ESP_Active then CreateESP(obj) end 
+                end)
             end
         end)
     else
@@ -65,9 +77,9 @@ local Window = Rayfield:CreateWindow({
 local MainTab = Window:CreateTab("Main")
 
 MainTab:CreateToggle({
-    Name = "ESP",
+    Name = "NPC ESP",
     CurrentValue = false,
-    Flag = "ESP", 
+    Flag = "NPC_ESP", 
     Callback = function(Value)
         ToggleESP(Value)
     end,

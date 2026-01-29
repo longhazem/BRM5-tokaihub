@@ -2,12 +2,13 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
 local ESP_Active = false
 local Hitbox_Active = false
 local Hitbox_Size = 5
 local Hitbox_Transparency = 0.5
 local TrackedModels = {}
-local DescendantConnection = nil
 
 local NPC_Config = {
     ["Male"] = { Color = Color3.fromRGB(0, 255, 0) },
@@ -19,54 +20,58 @@ local function IsPlayer(model)
     return Players:GetPlayerFromCharacter(model) ~= nil
 end
 
-local function ApplyNPCFeatures(model)
-    if IsPlayer(model) then return end
+local function ProcessNPC(model)
+    if not model or IsPlayer(model) then return end
     local config = NPC_Config[model.Name]
     if not config then return end
     
-    local head = model:WaitForChild("Head", 2)
+    local head = model:FindFirstChild("Head")
     if not head or not head:IsA("BasePart") then return end
 
-    -- Xử lý ESP
-    if ESP_Active and not head:FindFirstChild("Universal_ESP_Box") then
-        local box = Instance.new("BoxHandleAdornment")
-        box.Name = "Universal_ESP_Box"
+    -- Cập nhật ESP
+    if ESP_Active then
+        local box = head:FindFirstChild("Universal_ESP_Box")
+        if not box then
+            box = Instance.new("BoxHandleAdornment")
+            box.Name = "Universal_ESP_Box"
+            box.Adornee = head
+            box.AlwaysOnTop = true
+            box.ZIndex = 5
+            box.Transparency = 0.4
+            box.Parent = head
+        end
         box.Size = head.Size + Vector3.new(0.5, 0.5, 0.5)
-        box.Adornee = head
-        box.AlwaysOnTop = true
-        box.ZIndex = 5
         box.Color3 = config.Color
-        box.Transparency = 0.4
-        box.Parent = head
         TrackedModels[model] = box
+    else
+        local box = head:FindFirstChild("Universal_ESP_Box")
+        if box then box:Destroy() end
     end
 
-    -- Xử lý Hitbox
+    -- Cập nhật Hitbox thần tốc
     if Hitbox_Active then
         head.Size = Vector3.new(Hitbox_Size, Hitbox_Size, Hitbox_Size)
         head.Transparency = Hitbox_Transparency
-        head.BrickColor = BrickColor.new("Bright blue")
         head.CanCollide = false
     else
-        head.Size = Vector3.new(1.2, 1.2, 1.2) -- Kích thước mặc định BRM5
-        head.Transparency = 0
-    end
-end
-
-local function UpdateAllNPCs()
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("Model") and NPC_Config[obj.Name] then
-            ApplyNPCFeatures(obj)
+        -- Trả về trạng thái gốc nếu tắt
+        if head.Size ~= Vector3.new(1.2, 1.2, 1.2) then
+            head.Size = Vector3.new(1.2, 1.2, 1.2)
+            head.Transparency = 0
         end
     end
 end
 
-local function ClearESP()
-    for model, box in pairs(TrackedModels) do
-        if box then pcall(function() box:Destroy() end) end
+-- Vòng lặp siêu tốc 0.01s
+RunService.Stepped:Connect(function()
+    if ESP_Active or Hitbox_Active then
+        for _, obj in ipairs(Workspace:GetChildren()) do
+            if obj:IsA("Model") and NPC_Config[obj.Name] then
+                ProcessNPC(obj)
+            end
+        end
     end
-    TrackedModels = {}
-end
+end)
 
 local Window = Rayfield:CreateWindow({
     Name = "TOKAI-HUB-RBM5🐧",
@@ -85,34 +90,36 @@ MainTab:CreateToggle({
     Flag = "NPC_ESP", 
     Callback = function(Value)
         ESP_Active = Value
-        if not Value then ClearESP() end
-        UpdateAllNPCs()
+        if not Value then
+            for model, box in pairs(TrackedModels) do
+                if box then pcall(function() box:Destroy() end) end
+            end
+            TrackedModels = {}
+        end
     end,
 })
 
 local CombatTab = Window:CreateTab("Combat")
 
 CombatTab:CreateToggle({
-    Name = "NPC Head Hitbox",
+    Name = "Head Hitbox",
     CurrentValue = false,
-    Flag = "Hitbox_Toggle",
+    Flag = "Hitbox",
     Callback = function(Value)
         Hitbox_Active = Value
-        UpdateAllNPCs()
     end,
 })
 
 CombatTab:CreateSlider({
-    Name = "Hitbox Size",
+    Name = "Size",
     Min = 1,
     Max = 20,
     Default = 5,
     Color = Color3.fromRGB(0, 150, 255),
     Increment = 1,
-    ValueName = "Size",
+    ValueName = "Scale",
     Callback = function(Value)
         Hitbox_Size = Value
-        if Hitbox_Active then UpdateAllNPCs() end
     end,
 })
 
@@ -123,17 +130,7 @@ MiscTab:CreateButton({
     Callback = function()
         ESP_Active = false
         Hitbox_Active = false
-        UpdateAllNPCs()
-        ClearESP()
+        task.wait(0.1)
         Rayfield:Destroy()
     end,
 })
-
--- Vòng lặp quét NPC mới
-task.spawn(function()
-    while task.wait(2) do
-        if ESP_Active or Hitbox_Active then
-            UpdateAllNPCs()
-        end
-    end
-end)

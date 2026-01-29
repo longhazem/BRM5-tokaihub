@@ -3,6 +3,9 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 local ESP_Active = false
+local Hitbox_Active = false
+local Hitbox_Size = 5
+local Hitbox_Transparency = 0.5
 local TrackedModels = {}
 local DescendantConnection = nil
 
@@ -16,53 +19,53 @@ local function IsPlayer(model)
     return Players:GetPlayerFromCharacter(model) ~= nil
 end
 
-local function CreateESP(model)
+local function ApplyNPCFeatures(model)
     if IsPlayer(model) then return end
-    
     local config = NPC_Config[model.Name]
     if not config then return end
     
     local head = model:WaitForChild("Head", 2)
-    if not head or head:FindFirstChild("Universal_ESP_Box") then return end
+    if not head or not head:IsA("BasePart") then return end
 
-    local box = Instance.new("BoxHandleAdornment")
-    box.Name = "Universal_ESP_Box"
-    box.Size = head.Size + Vector3.new(0.5, 0.5, 0.5)
-    box.Adornee = head
-    box.AlwaysOnTop = true
-    box.ZIndex = 5
-    box.Color3 = config.Color
-    box.Transparency = 0.4
-    box.Parent = head
-    TrackedModels[model] = box
+    -- Xử lý ESP
+    if ESP_Active and not head:FindFirstChild("Universal_ESP_Box") then
+        local box = Instance.new("BoxHandleAdornment")
+        box.Name = "Universal_ESP_Box"
+        box.Size = head.Size + Vector3.new(0.5, 0.5, 0.5)
+        box.Adornee = head
+        box.AlwaysOnTop = true
+        box.ZIndex = 5
+        box.Color3 = config.Color
+        box.Transparency = 0.4
+        box.Parent = head
+        TrackedModels[model] = box
+    end
+
+    -- Xử lý Hitbox
+    if Hitbox_Active then
+        head.Size = Vector3.new(Hitbox_Size, Hitbox_Size, Hitbox_Size)
+        head.Transparency = Hitbox_Transparency
+        head.BrickColor = BrickColor.new("Bright blue")
+        head.CanCollide = false
+    else
+        head.Size = Vector3.new(1.2, 1.2, 1.2) -- Kích thước mặc định BRM5
+        head.Transparency = 0
+    end
 end
 
-local function ClearAllESP()
+local function UpdateAllNPCs()
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") and NPC_Config[obj.Name] then
+            ApplyNPCFeatures(obj)
+        end
+    end
+end
+
+local function ClearESP()
     for model, box in pairs(TrackedModels) do
         if box then pcall(function() box:Destroy() end) end
     end
     TrackedModels = {}
-end
-
-local function ToggleESP(state)
-    ESP_Active = state
-    if state then
-        for _, obj in ipairs(Workspace:GetDescendants()) do
-            if obj:IsA("Model") and NPC_Config[obj.Name] then 
-                CreateESP(obj) 
-            end
-        end
-        DescendantConnection = Workspace.DescendantAdded:Connect(function(obj)
-            if obj:IsA("Model") and NPC_Config[obj.Name] then
-                task.delay(0.5, function() 
-                    if ESP_Active then CreateESP(obj) end 
-                end)
-            end
-        end)
-    else
-        if DescendantConnection then DescendantConnection:Disconnect() end
-        ClearAllESP()
-    end
 end
 
 local Window = Rayfield:CreateWindow({
@@ -81,7 +84,35 @@ MainTab:CreateToggle({
     CurrentValue = false,
     Flag = "NPC_ESP", 
     Callback = function(Value)
-        ToggleESP(Value)
+        ESP_Active = Value
+        if not Value then ClearESP() end
+        UpdateAllNPCs()
+    end,
+})
+
+local CombatTab = Window:CreateTab("Combat")
+
+CombatTab:CreateToggle({
+    Name = "NPC Head Hitbox",
+    CurrentValue = false,
+    Flag = "Hitbox_Toggle",
+    Callback = function(Value)
+        Hitbox_Active = Value
+        UpdateAllNPCs()
+    end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Hitbox Size",
+    Min = 1,
+    Max = 20,
+    Default = 5,
+    Color = Color3.fromRGB(0, 150, 255),
+    Increment = 1,
+    ValueName = "Size",
+    Callback = function(Value)
+        Hitbox_Size = Value
+        if Hitbox_Active then UpdateAllNPCs() end
     end,
 })
 
@@ -90,7 +121,19 @@ local MiscTab = Window:CreateTab("Misc")
 MiscTab:CreateButton({
     Name = "Unload",
     Callback = function()
-        ToggleESP(false)
+        ESP_Active = false
+        Hitbox_Active = false
+        UpdateAllNPCs()
+        ClearESP()
         Rayfield:Destroy()
     end,
 })
+
+-- Vòng lặp quét NPC mới
+task.spawn(function()
+    while task.wait(2) do
+        if ESP_Active or Hitbox_Active then
+            UpdateAllNPCs()
+        end
+    end
+end)

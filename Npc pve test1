@@ -1,1 +1,84 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
+local Workspace = game:GetService("Workspace")
+local ESP_Active = false
+local TrackedModels = {}
+local DescendantConnection = nil
+
+local NPC_Config = {
+    ["Male"] = { Color = Color3.fromRGB(0, 255, 0) },
+    ["Zombie"] = { Color = Color3.fromRGB(255, 0, 0) },
+    ["Zombies"] = { Color = Color3.fromRGB(255, 0, 0) }
+}
+
+local function CreateESP(model)
+    local config = NPC_Config[model.Name]
+    if not config then return end
+    local head = model:WaitForChild("Head", 2)
+    if not head or head:FindFirstChild("Universal_ESP_Box") then return end
+
+    local box = Instance.new("BoxHandleAdornment")
+    box.Name = "Universal_ESP_Box"
+    box.Size = head.Size + Vector3.new(0.5, 0.5, 0.5)
+    box.Adornee = head
+    box.AlwaysOnTop = true
+    box.ZIndex = 5
+    box.Color3 = config.Color
+    box.Transparency = 0.4
+    box.Parent = head
+    TrackedModels[model] = box
+end
+
+local function ClearAllESP()
+    for model, box in pairs(TrackedModels) do
+        if box then pcall(function() box:Destroy() end) end
+    end
+    TrackedModels = {}
+end
+
+local function ToggleESP(state)
+    ESP_Active = state
+    if state then
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("Model") and NPC_Config[obj.Name] then CreateESP(obj) end
+        end
+        DescendantConnection = Workspace.DescendantAdded:Connect(function(obj)
+            if obj:IsA("Model") and NPC_Config[obj.Name] then
+                task.delay(0.5, function() if ESP_Active then CreateESP(obj) end end)
+            end
+        end)
+    else
+        if DescendantConnection then DescendantConnection:Disconnect() end
+        ClearAllESP()
+    end
+end
+
+local Window = Rayfield:CreateWindow({
+    Name = "TOKAI-HUB-RBM5🐧",
+    LoadingTitle = "TOKAI HUB",
+    LoadingSubtitle = "by LONGTOKAI",
+    Theme = "Bloom",
+    ConfigurationSaving = { Enabled = false },
+    KeySystem = false
+})
+
+local MainTab = Window:CreateTab("Main")
+
+MainTab:CreateToggle({
+    Name = "ESP",
+    CurrentValue = false,
+    Flag = "ESP", 
+    Callback = function(Value)
+        ToggleESP(Value)
+    end,
+})
+
+local MiscTab = Window:CreateTab("Misc")
+
+MiscTab:CreateButton({
+    Name = "Unload",
+    Callback = function()
+        ToggleESP(false)
+        Rayfield:Destroy()
+    end,
+})

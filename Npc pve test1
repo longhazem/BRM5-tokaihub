@@ -32,7 +32,7 @@ fovCircle.Visible = false
 
 -- [[ CỬA SỔ UI ]] --
 local Window = Rayfield:CreateWindow({
-    Name = "TOKAI-HUB-Zaibatsu+RP",
+    Name = "TOKAI-HUB-RBM5",
     Icon = 0,
     LoadingTitle = "TOKAI HUB",
     LoadingSubtitle = "by LONGTOKAI",

@@ -1,29 +1,27 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
--- Dịch vụ
+-- [[ DỊCH VỤ HỆ THỐNG ]] --
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local Camera = Workspace.CurrentCamera
-
--- Biến hệ thống
-local TARGET_NAMES = {"Male", "npc male", "Zombie"} 
-local TARGET_PART = "Head"
 local LocalPlayer = Players.LocalPlayer
 
--- State quản lý tính năng
-local _G = {
+-- [[ CẤU HÌNH ]] --
+getgenv().TokaiSettings = {
     WallEnabled = false,
     AimEnabled = false,
     HitboxEnabled = false,
-    NoRecoilEnabled = false,
+    HitboxSize = 5,
+    Smoothing = 95,
     FOVEnabled = false,
     FOVRadius = 100,
-    Smoothing = 95,
-    HitboxSize = 5,
+    NoRecoilEnabled = false,
     HoldingRightClick = false
 }
+
+local TARGET_NAMES = {"Male", "npc male", "Zombie"}
 
 -- FOV Circle
 local fovCircle = Drawing.new("Circle")
@@ -32,40 +30,31 @@ fovCircle.Thickness = 2
 fovCircle.Filled = false
 fovCircle.Visible = false
 
--- Helper Functions
-local function isValidNPC(model)
-    if not model:IsA("Model") or Players:GetPlayerFromCharacter(model) then return false end
-    return table.find(TARGET_NAMES, model.Name) ~= nil
-end
-
-local function getESPColor(modelName)
-    return (modelName == "zombie") and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(0, 255, 0)
-end
-
--- Khởi tạo Window
+-- [[ CỬA SỔ UI ]] --
 local Window = Rayfield:CreateWindow({
-    Name = "TOKAI-HUB-RBM5",
+    Name = "TOKAI-HUB-Zaibatsu+RP",
     Icon = 0,
-    LoadingTitle = "TOKAI",
+    LoadingTitle = "TOKAI HUB",
     LoadingSubtitle = "by LONGTOKAI",
     ConfigurationSaving = {
         Enabled = true,
-        FolderName = "TokaiHubBRM5",
+        FolderName = "TokaiHub_BRM5",
         FileName = "Config"
     },
     KeySystem = false
 })
 
--- Tab Chính
+-- [[ TAB MAIN ]] --
 local MainTab = Window:CreateTab("Main", 4483362458)
-local ESPSection = MainTab:CreateSection("ESP & Visuals")
+
+MainTab:CreateSection("ESP & Visuals")
 
 MainTab:CreateToggle({
     Name = "Enable Wall ESP",
     CurrentValue = false,
-    Flag = "WallToggle", 
+    Flag = "WallToggle",
     Callback = function(Value)
-        _G.WallEnabled = Value
+        getgenv().TokaiSettings.WallEnabled = Value
     end,
 })
 
@@ -74,32 +63,32 @@ MainTab:CreateToggle({
     CurrentValue = false,
     Flag = "FOVToggle",
     Callback = function(Value)
-        _G.FOVEnabled = Value
+        getgenv().TokaiSettings.FOVEnabled = Value
     end,
 })
 
 MainTab:CreateSlider({
     Name = "FOV Radius",
     Min = 10,
-    Max = 500,
+    Max = 600,
     Default = 100,
-    Color = Color3.fromRGB(0, 255, 255),
-    Increment = 1,
+    Increment = 5,
     ValueName = "Pixels",
-    Flag = "FOVRadius",
+    Flag = "FOVRad",
     Callback = function(Value)
-        _G.FOVRadius = Value
+        getgenv().TokaiSettings.FOVRadius = Value
     end,
 })
 
-local CombatSection = MainTab:CreateSection("Combat Features")
+-- QUAN TRỌNG: CÁC NÚT HITBOX NẰM Ở ĐÂY
+MainTab:CreateSection("Combat & Hitbox")
 
 MainTab:CreateToggle({
-    Name = "Aimlock (Right Click)",
+    Name = "Aimlock (Chuột Phải)",
     CurrentValue = false,
     Flag = "AimToggle",
     Callback = function(Value)
-        _G.AimEnabled = Value
+        getgenv().TokaiSettings.AimEnabled = Value
     end,
 })
 
@@ -108,49 +97,51 @@ MainTab:CreateSlider({
     Min = 0,
     Max = 99,
     Default = 95,
-    Color = Color3.fromRGB(255, 255, 255),
     Increment = 1,
     ValueName = "%",
-    Flag = "Smoothing",
+    Flag = "Smooth",
     Callback = function(Value)
-        _G.Smoothing = Value
+        getgenv().TokaiSettings.Smoothing = Value
     end,
 })
 
+-- NÚT BẬT HITBOX
 MainTab:CreateToggle({
-    Name = "Hitbox Expander",
+    Name = "Hitbox Expander (Headshot)",
     CurrentValue = false,
     Flag = "HitboxToggle",
     Callback = function(Value)
-        _G.HitboxEnabled = Value
+        getgenv().TokaiSettings.HitboxEnabled = Value
     end,
 })
 
+-- THANH CHỈNH ĐỘ RỘNG HITBOX
 MainTab:CreateSlider({
-    Name = "Hitbox Size",
+    Name = "Hitbox Size (Độ rộng)",
     Min = 1,
-    Max = 25,
+    Max = 30,
     Default = 5,
-    Color = Color3.fromRGB(255, 100, 0),
-    Increment = 0.5,
-    ValueName = "Size",
+    Increment = 1,
+    ValueName = "Scale",
     Flag = "HSize",
     Callback = function(Value)
-        _G.HitboxSize = Value
+        getgenv().TokaiSettings.HitboxSize = Value
     end,
 })
 
+-- [[ TAB MISC ]] --
 local MiscTab = Window:CreateTab("Misc", 4483362458)
-local WeaponSection = MiscTab:CreateSection("Weapon Mods")
+
+MiscTab:CreateSection("Weapon Mods")
 
 MiscTab:CreateToggle({
     Name = "No Recoil",
     CurrentValue = false,
     Flag = "RecoilToggle",
     Callback = function(Value)
-        _G.NoRecoilEnabled = Value
+        getgenv().TokaiSettings.NoRecoilEnabled = Value
+        -- Thực thi No Recoil ngay lập tức
         if Value then
-            -- Thực thi No Recoil ngay lập tức khi bật
             local weaponsFolder = game:GetService("ReplicatedStorage"):FindFirstChild("Shared")
                 and game:GetService("ReplicatedStorage").Shared:FindFirstChild("Configs")
                 and game:GetService("ReplicatedStorage").Shared.Configs:FindFirstChild("Weapon")
@@ -165,9 +156,8 @@ MiscTab:CreateToggle({
                                     local success, receiver = pcall(require, child)
                                     if success and receiver and receiver.Config and receiver.Config.Tune then
                                         local tune = receiver.Config.Tune
-                                        tune.Recoil_X = 0; tune.Recoil_Z = 0; tune.RecoilForce_Tap = 0
-                                        tune.RecoilForce_Impulse = 0; tune.Recoil_Range = Vector2.zero
-                                        tune.Recoil_Camera = 0
+                                        tune.Recoil_X = 0; tune.Recoil_Z = 0; tune.Recoil_Camera = 0
+                                        tune.RecoilForce_Tap = 0; tune.RecoilForce_Impulse = 0
                                     end
                                 end
                             end
@@ -179,88 +169,90 @@ MiscTab:CreateToggle({
     end,
 })
 
--- Logic Xử lý Game
-local trackedParts = {}
+-- [[ LOGIC HỆ THỐNG ]] --
 
-local function createESP(part, modelName)
-    if part:FindFirstChild("Wall_Box") then return end
-    local box = Instance.new("BoxHandleAdornment")
-    box.Name = "Wall_Box"
-    box.Size = part.Size + Vector3.new(0.1, 0.1, 0.1)
-    box.Adornee = part
-    box.AlwaysOnTop = true
-    box.ZIndex = 5
-    box.Color3 = getESPColor(modelName)
-    box.Transparency = _G.WallEnabled and 0.3 or 1
-    box.Parent = part
-    trackedParts[part] = box
+local function isValidNPC(model)
+    if not model:IsA("Model") or Players:GetPlayerFromCharacter(model) then return false end
+    return table.find(TARGET_NAMES, model.Name) ~= nil
 end
 
-local function getClosestNPC()
-    local target, dist = nil, math.huge
-    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-    for _, npc in ipairs(Workspace:GetChildren()) do
-        if isValidNPC(npc) then
-            local head = npc:FindFirstChild("Head")
-            if head then
-                local screenPos, visible = Camera:WorldToViewportPoint(head.Position)
-                if visible then
-                    local m = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
-                    if m < _G.FOVRadius and m < dist then dist = m; target = head end
-                end
-            end
-        end
-    end
-    return target
+local function getESPColor(modelName)
+    return (modelName == "Zombie") and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(0, 255, 0)
 end
 
--- Loop Chính
 RunService.RenderStepped:Connect(function()
-    -- FOV Update
-    fovCircle.Visible = _G.FOVEnabled and _G.AimEnabled
-    fovCircle.Radius = _G.FOVRadius
+    -- FOV
+    fovCircle.Visible = getgenv().TokaiSettings.FOVEnabled and getgenv().TokaiSettings.AimEnabled
+    fovCircle.Radius = getgenv().TokaiSettings.FOVRadius
     fovCircle.Position = UserInputService:GetMouseLocation()
 
-    -- ESP & Hitbox Update
+    -- Loop NPC
     for _, npc in ipairs(Workspace:GetChildren()) do
         if isValidNPC(npc) then
             local head = npc:FindFirstChild("Head")
             if head then
                 -- ESP
-                if not head:FindFirstChild("Wall_Box") then
-                    createESP(head, npc.Name)
+                local box = head:FindFirstChild("Wall_Box")
+                if not box then
+                    local newBox = Instance.new("BoxHandleAdornment")
+                    newBox.Name = "Wall_Box"
+                    newBox.Size = head.Size + Vector3.new(0.2, 0.2, 0.2)
+                    newBox.Adornee = head
+                    newBox.AlwaysOnTop = true
+                    newBox.ZIndex = 5
+                    newBox.Color3 = getESPColor(npc.Name)
+                    newBox.Transparency = getgenv().TokaiSettings.WallEnabled and 0.4 or 1
+                    newBox.Parent = head
                 else
-                    head.Wall_Box.Transparency = _G.WallEnabled and 0.3 or 1
+                    box.Transparency = getgenv().TokaiSettings.WallEnabled and 0.4 or 1
                 end
-                -- Hitbox
-                if _G.HitboxEnabled then
-                    head.Size = Vector3.new(_G.HitboxSize, _G.HitboxSize, _G.HitboxSize)
+
+                -- HITBOX LOGIC
+                if getgenv().TokaiSettings.HitboxEnabled then
+                    head.Size = Vector3.new(getgenv().TokaiSettings.HitboxSize, getgenv().TokaiSettings.TokaiSettings.HitboxSize, getgenv().TokaiSettings.HitboxSize)
                     head.CanCollide = false
                     head.Transparency = 0.5
                 else
-                    head.Size = Vector3.new(1.15, 1.15, 1.15) -- Reset size mặc định
+                    head.Size = Vector3.new(1.15, 1.15, 1.15)
                     head.Transparency = 0
                 end
             end
         end
     end
 
-    -- Aimlock Update
-    if _G.AimEnabled and _G.HoldingRightClick then
-        local target = getClosestNPC()
+    -- AIMLOCK
+    if getgenv().TokaiSettings.AimEnabled and getgenv().TokaiSettings.HoldingRightClick then
+        local target, dist = nil, math.huge
+        local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+        
+        for _, npc in ipairs(Workspace:GetChildren()) do
+            if isValidNPC(npc) then
+                local h = npc:FindFirstChild("Head")
+                if h then
+                    local sPos, vis = Camera:WorldToViewportPoint(h.Position)
+                    if vis then
+                        local m = (Vector2.new(sPos.X, sPos.Y) - center).Magnitude
+                        if m < getgenv().TokaiSettings.FOVRadius and m < dist then 
+                            dist = m; target = h 
+                        end
+                    end
+                end
+            end
+        end
+
         if target then
-            local targetPos = CFrame.new(Camera.CFrame.Position, target.Position)
-            Camera.CFrame = Camera.CFrame:Lerp(targetPos, (100 - _G.Smoothing) / 100 * 0.5)
+            local tCF = CFrame.new(Camera.CFrame.Position, target.Position)
+            Camera.CFrame = Camera.CFrame:Lerp(tCF, (100 - getgenv().TokaiSettings.Smoothing) / 100 * 0.5)
         end
     end
 end)
 
--- Input Events
+-- Mouse Event
 UserInputService.InputBegan:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton2 then _G.HoldingRightClick = true end
+    if i.UserInputType == Enum.UserInputType.MouseButton2 then getgenv().TokaiSettings.HoldingRightClick = true end
 end)
 UserInputService.InputEnded:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton2 then _G.HoldingRightClick = false end
+    if i.UserInputType == Enum.UserInputType.MouseButton2 then getgenv().TokaiSettings.HoldingRightClick = false end
 end)
 
 Rayfield:LoadConfiguration()

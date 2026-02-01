@@ -6,38 +6,36 @@ local RunService = game:GetService("RunService")
 local Camera = Workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- // BIẾN CẤU HÌNH //
+-- // DATA HỆ THỐNG //
 local Config = {
-    ESP_Active = false,
-    Hitbox_Active = false,
-    Hitbox_Size = 8,
-    Wall_Check = true,
-    Jitter_Safety = true,
-    Target_List = {["Male"] = true, ["Zombie"] = true, ["Zombies"] = true}
+    ESP = false,
+    Magic = false,
+    HitboxSize = 15,
+    WallCheck = true,
+    TargetNPCs = {["Male"] = true, ["Zombie"] = true, ["Zombies"] = true}
 }
 
--- // HÀM KIỂM TRA TẦM NHÌN (CHỐNG BAN) //
+-- // HÀM KIỂM TRA TẦM NHÌN //
 local function IsVisible(part)
-    if not Config.Wall_Check then return true end
+    if not Config.WallCheck then return true end
     local params = RaycastParams.new()
     params.FilterDescendantsInstances = {LocalPlayer.Character, part.Parent}
     params.FilterType = Enum.RaycastFilterType.Blacklist
-    
-    local ray = Workspace:Raycast(Camera.CFrame.Position, (part.Position - Camera.CFrame.Position).Unit * 1000, params)
-    return ray == nil
+    local result = Workspace:Raycast(Camera.CFrame.Position, (part.Position - Camera.CFrame.Position).Unit * 1000, params)
+    return result == nil
 end
 
--- // QUY TRÌNH XỬ LÝ NPC //
-local function ProcessNPC(model)
+-- // CORE LOGIC //
+local function UpdateNPC(model)
     local head = model:FindFirstChild("Head")
     if not head then return end
 
-    -- 1. ESP CỐ ĐỊNH KÍCH THƯỚC (KHÔNG BỊ TO THEO HITBOX)
-    local esp = head:FindFirstChild("Fixed_ESP_Marker")
-    if Config.ESP_Active then
+    -- ESP KHÔNG BỊ TO (Cố định size)
+    local esp = head:FindFirstChild("FixedESP")
+    if Config.ESP then
         if not esp then
             esp = Instance.new("BoxHandleAdornment")
-            esp.Name = "Fixed_ESP_Marker"
+            esp.Name = "FixedESP"
             esp.AlwaysOnTop = true
             esp.ZIndex = 10
             esp.Transparency = 0.5
@@ -45,128 +43,102 @@ local function ProcessNPC(model)
             esp.Parent = head
         end
         esp.Adornee = head
-        -- Khóa kích thước cố định để không bị ảnh hưởng bởi Head.Size
-        esp.Size = Vector3.new(1.2, 1.2, 1.2)
+        esp.Size = Vector3.new(1.2, 1.2, 1.2) -- Luôn giữ size này
     else
         if esp then esp:Destroy() end
     end
 
-    -- 2. MAGIC HITBOX (PART PHỤ TÀNG HÌNH)
-    local magicPart = head:FindFirstChild("Magic_Hitbox_Part")
-    local canActivate = Config.Hitbox_Active and IsVisible(head)
-
-    if canActivate then
-        if not magicPart then
-            magicPart = Instance.new("Part")
-            magicPart.Name = "Magic_Hitbox_Part"
-            magicPart.Transparency = 1
-            magicPart.CanCollide = false
-            magicPart.Massless = true
-            magicPart.CastShadow = false
+    -- MAGIC HITBOX (Redirect)
+    local magic = head:FindFirstChild("MagicPart")
+    if Config.Magic and IsVisible(head) then
+        if not magic then
+            magic = Instance.new("Part")
+            magic.Name = "MagicPart"
+            magic.Transparency = 1
+            magic.CanCollide = false
+            magic.Massless = true
             
             local weld = Instance.new("WeldConstraint")
             weld.Part0 = head
-            weld.Part1 = magicPart
-            weld.Parent = magicPart
-            magicPart.Parent = head
+            weld.Part1 = magic
+            weld.Parent = magic
+            magic.Parent = head
         end
-        
-        -- Dao động kích thước nhẹ (Jitter) để đánh lừa Anti-cheat
-        local jitter = Config.Jitter_Safety and (math.random(-15, 15) / 100) or 0
-        local finalSize = Config.Hitbox_Size + jitter
-        magicPart.Size = Vector3.new(finalSize, finalSize, finalSize)
+        magic.Size = Vector3.new(Config.HitboxSize, Config.HitboxSize, Config.HitboxSize)
     else
-        if magicPart then magicPart:Destroy() end
+        if magic then magic:Destroy() end
     end
 end
 
--- // VÒNG LẶP HỆ THỐNG //
-local MainConnection
-MainConnection = RunService.RenderStepped:Connect(function()
+-- // LOOP //
+local Loop = RunService.RenderStepped:Connect(function()
     for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("Model") and Config.Target_List[obj.Name] then
-            ProcessNPC(obj)
+        if obj:IsA("Model") and Config.TargetNPCs[obj.Name] then
+            UpdateNPC(obj)
         end
     end
 end)
 
--- // GIAO DIỆN //
+-- // GIAO DIỆN MỚI (FIX CHO MOBILE) //
 local Window = Rayfield:CreateWindow({
-    Name = "TOKAI-HUB (FIXED ESP)🛡️",
-    LoadingTitle = "NPC Specialist System",
-    LoadingSubtitle = "Male | Zombie | Zombies",
+    Name = "TOKAI-HUB V4 🛡️",
+    LoadingTitle = "Mobile Fix Loaded",
+    LoadingSubtitle = "Male | Zombie Specialist",
     Theme = "Bloom",
     ConfigurationSaving = { Enabled = false }
 })
 
-local CombatTab = Window:CreateTab("Combat 🔫")
+-- Gom tất cả vào 2 Tab chính để dễ nhìn trên điện thoại
+local MainTab = Window:CreateTab("Combat ⚔️")
+local VisualTab = Window:CreateTab("Visuals 👁️")
 
-CombatTab:CreateToggle({
+-- PHẦN CHIẾN ĐẤU
+MainTab:CreateSection("Main Cheats")
+
+MainTab:CreateToggle({
     Name = "Magic Hitbox",
     CurrentValue = false,
     Callback = function(Value)
-        Config.Hitbox_Active = Value
+        Config.Magic = Value
     end,
 })
 
-CombatTab:CreateSlider({
-    Name = "Hitbox Radius",
+MainTab:CreateSlider({
+    Name = "Hitbox Radius (1-30)",
     Min = 1,
     Max = 30,
-    Default = 8,
+    Default = 15,
     Increment = 1,
     Callback = function(Value)
-        Config.Hitbox_Size = Value
+        Config.HitboxSize = Value
     end,
 })
 
-CombatTab:CreateSection("Security")
+MainTab:CreateSection("Safety Features")
 
-CombatTab:CreateToggle({
+MainTab:CreateToggle({
     Name = "Anti-Wall Ban",
     CurrentValue = true,
     Callback = function(Value)
-        Config.Wall_Check = Value
+        Config.WallCheck = Value
     end,
 })
 
-CombatTab:CreateToggle({
-    Name = "Security Jitter",
-    CurrentValue = true,
-    Callback = function(Value)
-        Config.Jitter_Safety = Value
-    end,
-})
-
-local VisualTab = Window:CreateTab("Visuals 👁️")
+-- PHẦN HIỂN THỊ
+VisualTab:CreateSection("ESP Settings")
 
 VisualTab:CreateToggle({
-    Name = "Fix Size ESP",
+    Name = "NPC ESP (Fixed Size)",
     CurrentValue = false,
     Callback = function(Value)
-        Config.ESP_Active = Value
+        Config.ESP = Value
     end,
 })
 
-local MiscTab = Window:CreateTab("Misc ⚙️")
-
-MiscTab:CreateButton({
-    Name = "Unload Script",
+VisualTab:CreateButton({
+    Name = "Force Unload Script",
     Callback = function()
-        Config.ESP_Active = false
-        Config.Hitbox_Active = false
-        if MainConnection then MainConnection:Disconnect() end
-        task.wait(0.2)
-        -- Dọn dẹp Workspace
-        for _, obj in ipairs(Workspace:GetDescendants()) do
-            if Config.Target_List[obj.Name] then
-                local h = obj:FindFirstChild("Head")
-                if h then
-                    if h:FindFirstChild("Magic_Hitbox_Part") then h.Magic_Hitbox_Part:Destroy() end
-                    if h:FindFirstChild("Fixed_ESP_Marker") then h.Fixed_ESP_Marker:Destroy() end
-                end
-            end
-        end
+        Loop:Disconnect()
         Rayfield:Destroy()
     end,
 })

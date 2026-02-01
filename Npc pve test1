@@ -6,18 +6,18 @@ local RunService = game:GetService("RunService")
 local Camera = Workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- // DATA HỆ THỐNG //
+-- // SETTINGS //
 local Config = {
-    ESP = false,
-    Magic = false,
-    HitboxSize = 15,
-    WallCheck = true,
-    TargetNPCs = {["Male"] = true, ["Zombie"] = true, ["Zombies"] = true}
+    ESP_Enabled = false,
+    Magic_Enabled = false,
+    Hitbox_Size = 10,
+    Wall_Check = true,
+    Target_NPCs = {["Male"] = true, ["Zombie"] = true, ["Zombies"] = true}
 }
 
--- // HÀM KIỂM TRA TẦM NHÌN //
-local function IsVisible(part)
-    if not Config.WallCheck then return true end
+-- // CORE FUNCTIONS //
+local function IsInSight(part)
+    if not Config.Wall_Check then return true end
     local params = RaycastParams.new()
     params.FilterDescendantsInstances = {LocalPlayer.Character, part.Parent}
     params.FilterType = Enum.RaycastFilterType.Blacklist
@@ -25,35 +25,34 @@ local function IsVisible(part)
     return result == nil
 end
 
--- // CORE LOGIC //
 local function UpdateNPC(model)
     local head = model:FindFirstChild("Head")
     if not head then return end
 
-    -- ESP KHÔNG BỊ TO (Cố định size)
-    local esp = head:FindFirstChild("FixedESP")
-    if Config.ESP then
+    -- 1. FIXED ESP (Nút On/Off ở Tab Visuals)
+    local esp = head:FindFirstChild("Mobile_ESP")
+    if Config.ESP_Enabled then
         if not esp then
             esp = Instance.new("BoxHandleAdornment")
-            esp.Name = "FixedESP"
+            esp.Name = "Mobile_ESP"
             esp.AlwaysOnTop = true
             esp.ZIndex = 10
             esp.Transparency = 0.5
-            esp.Color3 = Color3.fromRGB(0, 255, 255)
+            esp.Color3 = Color3.fromRGB(0, 255, 150)
             esp.Parent = head
         end
         esp.Adornee = head
-        esp.Size = Vector3.new(1.2, 1.2, 1.2) -- Luôn giữ size này
+        esp.Size = Vector3.new(1.2, 1.2, 1.2) -- Khóa cứng size nhỏ
     else
         if esp then esp:Destroy() end
     end
 
-    -- MAGIC HITBOX (Redirect)
-    local magic = head:FindFirstChild("MagicPart")
-    if Config.Magic and IsVisible(head) then
+    -- 2. MAGIC HITBOX
+    local magic = head:FindFirstChild("Mobile_Magic")
+    if Config.Magic_Enabled and IsInSight(head) then
         if not magic then
             magic = Instance.new("Part")
-            magic.Name = "MagicPart"
+            magic.Name = "Mobile_Magic"
             magic.Transparency = 1
             magic.CanCollide = false
             magic.Massless = true
@@ -64,81 +63,89 @@ local function UpdateNPC(model)
             weld.Parent = magic
             magic.Parent = head
         end
-        magic.Size = Vector3.new(Config.HitboxSize, Config.HitboxSize, Config.HitboxSize)
+        magic.Size = Vector3.new(Config.Hitbox_Size, Config.Hitbox_Size, Config.Hitbox_Size)
     else
         if magic then magic:Destroy() end
     end
 end
 
--- // LOOP //
-local Loop = RunService.RenderStepped:Connect(function()
+-- // RENDER LOOP //
+local MainLoop = RunService.RenderStepped:Connect(function()
     for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("Model") and Config.TargetNPCs[obj.Name] then
+        if obj:IsA("Model") and Config.Target_NPCs[obj.Name] then
             UpdateNPC(obj)
         end
     end
 end)
 
--- // GIAO DIỆN MỚI (FIX CHO MOBILE) //
+-- // UI INTERFACE //
 local Window = Rayfield:CreateWindow({
-    Name = "TOKAI-HUB V4 🛡️",
-    LoadingTitle = "Mobile Fix Loaded",
-    LoadingSubtitle = "Male | Zombie Specialist",
+    Name = "TOKAI-HUB V5 (MOBILE)🐧",
+    LoadingTitle = "Fixing ESP Controls...",
+    LoadingSubtitle = "Male | Zombie | Zombies",
     Theme = "Bloom",
     ConfigurationSaving = { Enabled = false }
 })
 
--- Gom tất cả vào 2 Tab chính để dễ nhìn trên điện thoại
-local MainTab = Window:CreateTab("Combat ⚔️")
+local CombatTab = Window:CreateTab("Combat ⚔️")
 local VisualTab = Window:CreateTab("Visuals 👁️")
 
--- PHẦN CHIẾN ĐẤU
-MainTab:CreateSection("Main Cheats")
+-- TAB COMBAT
+CombatTab:CreateSection("Magic Settings")
 
-MainTab:CreateToggle({
+CombatTab:CreateToggle({
     Name = "Magic Hitbox",
     CurrentValue = false,
     Callback = function(Value)
-        Config.Magic = Value
+        Config.Magic_Enabled = Value
     end,
 })
 
-MainTab:CreateSlider({
-    Name = "Hitbox Radius (1-30)",
+CombatTab:CreateSlider({
+    Name = "Hitbox Radius",
     Min = 1,
-    Max = 30,
-    Default = 15,
+    Max = 30, -- Khóa tối đa 30 để an toàn
+    Default = 10,
     Increment = 1,
+    ValueName = "Studs",
     Callback = function(Value)
-        Config.HitboxSize = Value
+        Config.Hitbox_Size = Value
     end,
 })
 
-MainTab:CreateSection("Safety Features")
-
-MainTab:CreateToggle({
+CombatTab:CreateToggle({
     Name = "Anti-Wall Ban",
     CurrentValue = true,
     Callback = function(Value)
-        Config.WallCheck = Value
+        Config.Wall_Check = Value
     end,
 })
 
--- PHẦN HIỂN THỊ
-VisualTab:CreateSection("ESP Settings")
+-- TAB VISUALS (SỬA LỖI NÚT ESP)
+VisualTab:CreateSection("ESP Controls")
 
 VisualTab:CreateToggle({
-    Name = "NPC ESP (Fixed Size)",
+    Name = "Enable NPC ESP", -- Đây là nút bạn cần
     CurrentValue = false,
     Callback = function(Value)
-        Config.ESP = Value
+        Config.ESP_Enabled = Value
+    end,
+})
+
+VisualTab:CreateSection("Extra")
+
+VisualTab:CreateButton({
+    Name = "Reset Everything",
+    Callback = function()
+        Config.ESP_Enabled = false
+        Config.Magic_Enabled = false
     end,
 })
 
 VisualTab:CreateButton({
-    Name = "Force Unload Script",
+    Name = "Unload Script",
     Callback = function()
-        Loop:Disconnect()
+        MainLoop:Disconnect()
         Rayfield:Destroy()
     end,
 })

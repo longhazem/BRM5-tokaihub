@@ -3,154 +3,175 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local Camera = Workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
 
-local ESP_Active = false
-local Hitbox_Active = false
-local Hitbox_Size = 10
-local Hitbox_Transparency = 0.8 -- Chỉnh 1 nếu muốn tàng hình hoàn toàn
-
-local NPC_Config = {
-    ["Male"] = { Color = Color3.fromRGB(0, 255, 0) },
-    ["Zombie"] = { Color = Color3.fromRGB(255, 0, 0) },
-    ["Zombies"] = { Color = Color3.fromRGB(255, 0, 0) }
+-- // TRẠNG THÁI HỆ THỐNG //
+local Config = {
+    ESP = false,
+    Hitbox = false,
+    Size = 6,
+    Transparency = 1,
+    FOV_Check = true, -- Chỉ bật hitbox khi nhìn về phía mục tiêu
+    Wall_Check = true -- Không bật hitbox nếu địch sau tường
 }
 
-local function IsPlayer(model)
-    return Players:GetPlayerFromCharacter(model) ~= nil
+local NPC_Names = { ["Male"] = true, ["Zombie"] = true, ["Zombies"] = true }
+
+-- // HÀM KIỂM TRA AN TOÀN //
+local function IsVisible(targetPart)
+    if not Config.Wall_Check then return true end
+    local params = RaycastParams.new()
+    params.FilterDescendantsInstances = {LocalPlayer.Character, targetPart.Parent}
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+    
+    local origin = Camera.CFrame.Position
+    local direction = (targetPart.Position - origin).Unit * (targetPart.Position - origin).Magnitude
+    local result = Workspace:Raycast(origin, direction, params)
+    
+    return result == nil -- Nếu không chạm gì tức là nhìn thấy
 end
 
--- Hàm xử lý cơ chế Redirect Hitbox
-local function ApplyRedirectHitbox(model)
-    if IsPlayer(model) then return end
+local function IsInFOV(targetPart)
+    if not Config.FOV_Check then return true end
+    local _, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+    return onScreen
+end
+
+-- // QUẢN LÝ NPC //
+local function ApplyEliteFeatures(model)
+    if Players:GetPlayerFromCharacter(model) then return end
     local head = model:FindFirstChild("Head")
     if not head or not head:IsA("BasePart") then return end
-    local config = NPC_Config[model.Name]
 
-    -- 1. TẠO HITBOX PHỤ (REDIRECTOR)
-    -- Thay vì phóng to Head thật, ta tạo 1 Part tàng hình bám theo Head
-    local fakeHitbox = head:FindFirstChild("Redirect_Part")
-    if Hitbox_Active then
-        if not fakeHitbox then
-            fakeHitbox = Instance.new("Part")
-            fakeHitbox.Name = "Redirect_Part"
-            fakeHitbox.Shape = Enum.PartType.Block
-            fakeHitbox.CanCollide = false
-            fakeHitbox.Massless = true
-            fakeHitbox.Anchored = false
-            fakeHitbox.CastShadow = false
-            
-            -- Tạo mối nối để Part này luôn dính cứng vào Head
-            local weld = Instance.new("WeldConstraint")
-            weld.Part0 = head
-            weld.Part1 = fakeHitbox
-            weld.Parent = fakeHitbox
-            
-            fakeHitbox.Parent = head
-        end
-        
-        -- Cập nhật thông số
-        fakeHitbox.Size = Vector3.new(Hitbox_Size, Hitbox_Size, Hitbox_Size)
-        fakeHitbox.CFrame = head.CFrame
-        fakeHitbox.Transparency = Hitbox_Transparency
-        fakeHitbox.Color = config.Color
-        fakeHitbox.Material = Enum.Material.ForceField -- Hiệu ứng đẹp nếu không tàng hình
-    else
-        if fakeHitbox then fakeHitbox:Destroy() end
-    end
-
-    -- 2. ESP CỐ ĐỊNH (Không bị to theo hitbox)
-    local esp = head:FindFirstChild("Fixed_ESP")
-    if ESP_Active then
+    -- ESP AN TOÀN (Cố định kích thước chuẩn)
+    local esp = head:FindFirstChild("Elite_ESP")
+    if Config.ESP then
         if not esp then
             esp = Instance.new("BoxHandleAdornment")
-            esp.Name = "Fixed_ESP"
+            esp.Name = "Elite_ESP"
             esp.AlwaysOnTop = true
             esp.ZIndex = 5
-            esp.Transparency = 0.5
-            esp.Color3 = config.Color
+            esp.Transparency = 0.6
+            esp.Color3 = Color3.fromRGB(0, 255, 127)
             esp.Parent = head
         end
         esp.Adornee = head
-        esp.Size = Vector3.new(1.5, 1.5, 1.5)
+        esp.Size = Vector3.new(1.3, 1.3, 1.3)
     else
         if esp then esp:Destroy() end
     end
+
+    -- HITBOX BẢO MẬT (Tự động thích ứng)
+    local hitbox = head:FindFirstChild("Stealth_Part")
+    local shouldActivate = Config.Hitbox and IsVisible(head) and IsInFOV(head)
+
+    if shouldActivate then
+        if not hitbox then
+            hitbox = Instance.new("Part")
+            hitbox.Name = "Stealth_Part"
+            hitbox.CanCollide = false
+            hitbox.Massless = true
+            hitbox.CastShadow = false
+            hitbox.Transparency = 1 -- Luôn tàng hình
+            
+            local weld = Instance.new("WeldConstraint")
+            weld.Part0 = head
+            weld.Part1 = hitbox
+            weld.Parent = hitbox
+            hitbox.Parent = head
+        end
+        
+        -- Jitter: Kích thước thay đổi ngẫu nhiên nhẹ để qua mặt server
+        local jitter = (math.random(-10, 10) / 100)
+        local safeSize = Config.Size + jitter
+        hitbox.Size = Vector3.new(safeSize, safeSize, safeSize)
+    else
+        if hitbox then hitbox:Destroy() end
+    end
 end
 
--- Vòng lặp cập nhật
-local Connection
-Connection = RunService.RenderStepped:Connect(function()
-    if not (ESP_Active or Hitbox_Active) then return end
+-- // VÒNG LẶP CHÍNH (RenderStepped cho độ trễ thấp nhất) //
+local MainLoop
+MainLoop = RunService.RenderStepped:Connect(function()
+    if not (Config.ESP or Config.Hitbox) then return end
+    
     for _, obj in ipairs(Workspace:GetChildren()) do
-        if obj:IsA("Model") and NPC_Config[obj.Name] then
-            ApplyRedirectHitbox(obj)
+        if obj:IsA("Model") and NPC_Names[obj.Name] then
+            ApplyEliteFeatures(obj)
         end
     end
 end)
 
 -- // GIAO DIỆN //
 local Window = Rayfield:CreateWindow({
-    Name = "TOKAI-HUB (REDIRECT)🐧",
-    LoadingTitle = "Redirect Hitbox System",
-    LoadingSubtitle = "by LONGTOKAI",
+    Name = "TOKAI-HUB (ELITE SAFE)🛡️",
+    LoadingTitle = "Secured Environment",
+    LoadingSubtitle = "Anti-Ban Protection Active",
     Theme = "Bloom",
     ConfigurationSaving = { Enabled = false }
 })
 
-local MainTab = Window:CreateTab("Combat")
+local CombatTab = Window:CreateTab("Combat")
 
-MainTab:CreateToggle({
-    Name = "Enable Redirect Hitbox",
+CombatTab:CreateToggle({
+    Name = "Elite Stealth Hitbox",
     CurrentValue = false,
     Callback = function(Value)
-        Hitbox_Active = Value
+        Config.Hitbox = Value
     end,
 })
 
-MainTab:CreateSlider({
-    Name = "Hitbox Size",
+CombatTab:CreateSlider({
+    Name = "Safe Hitbox Radius",
     Min = 1,
-    Max = 30,
-    Default = 10,
-    Color = Color3.fromRGB(255, 50, 50),
-    Increment = 1,
+    Max = 15,
+    Default = 6,
+    Color = Color3.fromRGB(0, 170, 255),
+    Increment = 0.5,
     ValueName = "Studs",
     Callback = function(Value)
-        Hitbox_Size = Value
+        Config.Size = Value
     end,
 })
 
-MainTab:CreateSlider({
-    Name = "Hitbox Visibility",
-    Min = 0,
-    Max = 1,
-    Default = 0.8,
-    Increment = 0.1,
-    ValueName = "Transparency",
+CombatTab:CreateToggle({
+    Name = "Wall Check (Bảo mật cao)",
+    CurrentValue = true,
     Callback = function(Value)
-        Hitbox_Transparency = Value
+        Config.Wall_Check = Value
     end,
 })
 
 local VisualTab = Window:CreateTab("Visuals")
 
 VisualTab:CreateToggle({
-    Name = "NPC ESP",
+    Name = "Fixed ESP",
     CurrentValue = false,
     Callback = function(Value)
-        ESP_Active = Value
+        Config.ESP = Value
     end,
 })
 
 local MiscTab = Window:CreateTab("Misc")
 
 MiscTab:CreateButton({
-    Name = "Unload",
+    Name = "Safe Unload",
     Callback = function()
-        Hitbox_Active = false
-        ESP_Active = false
-        if Connection then Connection:Disconnect() end
+        Config.Hitbox = false
+        Config.ESP = false
+        if MainLoop then MainLoop:Disconnect() end
         task.wait(0.2)
+        -- Dọn dẹp triệt để
+        for _, obj in ipairs(Workspace:GetChildren()) do
+            if obj:IsA("Model") and NPC_Names[obj.Name] then
+                local head = obj:FindFirstChild("Head")
+                if head then
+                    if head:FindFirstChild("Stealth_Part") then head.Stealth_Part:Destroy() end
+                    if head:FindFirstChild("Elite_ESP") then head.Elite_ESP:Destroy() end
+                end
+            end
+        end
         Rayfield:Destroy()
     end,
 })

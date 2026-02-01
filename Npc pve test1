@@ -6,9 +6,8 @@ local RunService = game:GetService("RunService")
 
 local ESP_Active = false
 local Hitbox_Active = false
-local Hitbox_Size = 5
-local Hitbox_Transparency = 0.5
-local TrackedModels = {}
+local Hitbox_Size = 10
+local Hitbox_Transparency = 0.8 -- Chỉnh 1 nếu muốn tàng hình hoàn toàn
 
 local NPC_Config = {
     ["Male"] = { Color = Color3.fromRGB(0, 255, 0) },
@@ -20,106 +19,126 @@ local function IsPlayer(model)
     return Players:GetPlayerFromCharacter(model) ~= nil
 end
 
-local function ProcessNPC(model)
-    if not model or IsPlayer(model) then return end
-    local config = NPC_Config[model.Name]
-    if not config then return end
-    
+-- Hàm xử lý cơ chế Redirect Hitbox
+local function ApplyRedirectHitbox(model)
+    if IsPlayer(model) then return end
     local head = model:FindFirstChild("Head")
     if not head or not head:IsA("BasePart") then return end
+    local config = NPC_Config[model.Name]
 
-    -- Cập nhật ESP
-    if ESP_Active then
-        local box = head:FindFirstChild("Universal_ESP_Box")
-        if not box then
-            box = Instance.new("BoxHandleAdornment")
-            box.Name = "Universal_ESP_Box"
-            box.Adornee = head
-            box.AlwaysOnTop = true
-            box.ZIndex = 5
-            box.Transparency = 0.4
-            box.Parent = head
+    -- 1. TẠO HITBOX PHỤ (REDIRECTOR)
+    -- Thay vì phóng to Head thật, ta tạo 1 Part tàng hình bám theo Head
+    local fakeHitbox = head:FindFirstChild("Redirect_Part")
+    if Hitbox_Active then
+        if not fakeHitbox then
+            fakeHitbox = Instance.new("Part")
+            fakeHitbox.Name = "Redirect_Part"
+            fakeHitbox.Shape = Enum.PartType.Block
+            fakeHitbox.CanCollide = false
+            fakeHitbox.Massless = true
+            fakeHitbox.Anchored = false
+            fakeHitbox.CastShadow = false
+            
+            -- Tạo mối nối để Part này luôn dính cứng vào Head
+            local weld = Instance.new("WeldConstraint")
+            weld.Part0 = head
+            weld.Part1 = fakeHitbox
+            weld.Parent = fakeHitbox
+            
+            fakeHitbox.Parent = head
         end
-        box.Size = head.Size + Vector3.new(0.5, 0.5, 0.5)
-        box.Color3 = config.Color
-        TrackedModels[model] = box
+        
+        -- Cập nhật thông số
+        fakeHitbox.Size = Vector3.new(Hitbox_Size, Hitbox_Size, Hitbox_Size)
+        fakeHitbox.CFrame = head.CFrame
+        fakeHitbox.Transparency = Hitbox_Transparency
+        fakeHitbox.Color = config.Color
+        fakeHitbox.Material = Enum.Material.ForceField -- Hiệu ứng đẹp nếu không tàng hình
     else
-        local box = head:FindFirstChild("Universal_ESP_Box")
-        if box then box:Destroy() end
+        if fakeHitbox then fakeHitbox:Destroy() end
     end
 
-    -- Cập nhật Hitbox thần tốc
-    if Hitbox_Active then
-        head.Size = Vector3.new(Hitbox_Size, Hitbox_Size, Hitbox_Size)
-        head.Transparency = Hitbox_Transparency
-        head.CanCollide = false
-    else
-        -- Trả về trạng thái gốc nếu tắt
-        if head.Size ~= Vector3.new(1.2, 1.2, 1.2) then
-            head.Size = Vector3.new(1.2, 1.2, 1.2)
-            head.Transparency = 0
+    -- 2. ESP CỐ ĐỊNH (Không bị to theo hitbox)
+    local esp = head:FindFirstChild("Fixed_ESP")
+    if ESP_Active then
+        if not esp then
+            esp = Instance.new("BoxHandleAdornment")
+            esp.Name = "Fixed_ESP"
+            esp.AlwaysOnTop = true
+            esp.ZIndex = 5
+            esp.Transparency = 0.5
+            esp.Color3 = config.Color
+            esp.Parent = head
         end
+        esp.Adornee = head
+        esp.Size = Vector3.new(1.5, 1.5, 1.5)
+    else
+        if esp then esp:Destroy() end
     end
 end
 
--- Vòng lặp siêu tốc 0.01s
-RunService.Stepped:Connect(function()
-    if ESP_Active or Hitbox_Active then
-        for _, obj in ipairs(Workspace:GetChildren()) do
-            if obj:IsA("Model") and NPC_Config[obj.Name] then
-                ProcessNPC(obj)
-            end
+-- Vòng lặp cập nhật
+local Connection
+Connection = RunService.RenderStepped:Connect(function()
+    if not (ESP_Active or Hitbox_Active) then return end
+    for _, obj in ipairs(Workspace:GetChildren()) do
+        if obj:IsA("Model") and NPC_Config[obj.Name] then
+            ApplyRedirectHitbox(obj)
         end
     end
 end)
 
+-- // GIAO DIỆN //
 local Window = Rayfield:CreateWindow({
-    Name = "TOKAI-HUB-RBM5🐧",
-    LoadingTitle = "TOKAI HUB",
+    Name = "TOKAI-HUB (REDIRECT)🐧",
+    LoadingTitle = "Redirect Hitbox System",
     LoadingSubtitle = "by LONGTOKAI",
     Theme = "Bloom",
-    ConfigurationSaving = { Enabled = false },
-    KeySystem = false
+    ConfigurationSaving = { Enabled = false }
 })
 
-local MainTab = Window:CreateTab("Main")
+local MainTab = Window:CreateTab("Combat")
 
 MainTab:CreateToggle({
-    Name = "NPC ESP",
+    Name = "Enable Redirect Hitbox",
     CurrentValue = false,
-    Flag = "NPC_ESP", 
-    Callback = function(Value)
-        ESP_Active = Value
-        if not Value then
-            for model, box in pairs(TrackedModels) do
-                if box then pcall(function() box:Destroy() end) end
-            end
-            TrackedModels = {}
-        end
-    end,
-})
-
-local CombatTab = Window:CreateTab("Combat")
-
-CombatTab:CreateToggle({
-    Name = "Head Hitbox",
-    CurrentValue = false,
-    Flag = "Hitbox",
     Callback = function(Value)
         Hitbox_Active = Value
     end,
 })
 
-CombatTab:CreateSlider({
-    Name = "Size",
+MainTab:CreateSlider({
+    Name = "Hitbox Size",
     Min = 1,
-    Max = 20,
-    Default = 5,
-    Color = Color3.fromRGB(0, 150, 255),
+    Max = 30,
+    Default = 10,
+    Color = Color3.fromRGB(255, 50, 50),
     Increment = 1,
-    ValueName = "Scale",
+    ValueName = "Studs",
     Callback = function(Value)
         Hitbox_Size = Value
+    end,
+})
+
+MainTab:CreateSlider({
+    Name = "Hitbox Visibility",
+    Min = 0,
+    Max = 1,
+    Default = 0.8,
+    Increment = 0.1,
+    ValueName = "Transparency",
+    Callback = function(Value)
+        Hitbox_Transparency = Value
+    end,
+})
+
+local VisualTab = Window:CreateTab("Visuals")
+
+VisualTab:CreateToggle({
+    Name = "NPC ESP",
+    CurrentValue = false,
+    Callback = function(Value)
+        ESP_Active = Value
     end,
 })
 
@@ -128,9 +147,10 @@ local MiscTab = Window:CreateTab("Misc")
 MiscTab:CreateButton({
     Name = "Unload",
     Callback = function()
-        ESP_Active = false
         Hitbox_Active = false
-        task.wait(0.1)
+        ESP_Active = false
+        if Connection then Connection:Disconnect() end
+        task.wait(0.2)
         Rayfield:Destroy()
     end,
 })

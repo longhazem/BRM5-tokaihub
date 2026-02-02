@@ -1,162 +1,138 @@
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-
-local Workspace = game:GetService("Workspace")
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local Camera = Workspace.CurrentCamera
-local LocalPlayer = Players.LocalPlayer
-
--- // TRẠNG THÁI HỆ THỐNG //
-local Config = {
-    ESP_Enabled = false,
-    Magic_Enabled = false,
-    Wall_Check = true,
-    Jitter_Mode = true,
-    Hitbox_Size = 10,
-    Target_NPCs = {["Male"] = true, ["Zombie"] = true, ["Zombies"] = true}
+-- /// CẤU HÌNH CƠ BẢN ///
+local Settings = {
+    Enabled = false,       -- Bật/Tắt chức năng
+    FOV = 150,             -- Phạm vi hoạt động (vòng tròn quanh chuột)
+    TargetPart = "Head",   -- Phần cơ thể muốn nhắm vào
+    TeamCheck = true       -- Kiểm tra đồng đội (True = không nhắm đồng đội)
 }
 
--- // HÀM KIỂM TRA BẢO MẬT //
-local function IsVisible(part)
-    if not Config.Wall_Check then return true end
-    local params = RaycastParams.new()
-    params.FilterDescendantsInstances = {LocalPlayer.Character, part.Parent}
-    params.FilterType = Enum.RaycastFilterType.Blacklist
-    local result = Workspace:Raycast(Camera.CFrame.Position, (part.Position - Camera.CFrame.Position).Unit * 1000, params)
-    return result == nil
+-- /// DỊCH VỤ (SERVICES) ///
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local Mouse = LocalPlayer:GetMouse()
+
+-- /// TẠO UI TỰ CHẾ (CUSTOM UI - NO LIBRARY) ///
+-- Xóa UI cũ nếu có để tránh trùng lặp
+if game.CoreGui:FindFirstChild("MyCustomAimUI") then
+    game.CoreGui.MyCustomAimUI:Destroy()
 end
 
--- // HÀM XỬ LÝ NPC TỔNG HỢP //
-local function ProcessNPC(model)
-    local head = model:FindFirstChild("Head")
-    if not head then return end
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "MyCustomAimUI"
+ScreenGui.Parent = game.CoreGui -- Đưa vào CoreGui để không bị reset khi chết
 
-    -- 1. ESP CỐ ĐỊNH SIZE (Sửa lỗi to theo hitbox)
-    local esp = head:FindFirstChild("Fixed_ESP")
-    if Config.ESP_Enabled then
-        if not esp then
-            esp = Instance.new("BoxHandleAdornment")
-            esp.Name = "Fixed_ESP"
-            esp.AlwaysOnTop = true
-            esp.ZIndex = 10
-            esp.Transparency = 0.5
-            esp.Color3 = Color3.fromRGB(0, 255, 255)
-            esp.Parent = head
-        end
-        esp.Adornee = head
-        esp.Size = Vector3.new(1.2, 1.2, 1.2) -- Khóa kích thước chuẩn
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 200, 0, 120)
+MainFrame.Position = UDim2.new(0.5, -100, 0.5, -60)
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35) -- Màu xám tối
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true -- Cho phép kéo thả bảng
+MainFrame.Parent = ScreenGui
+
+-- Bo tròn góc
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+-- Tiêu đề
+local Title = Instance.new("TextLabel")
+Title.Text = "TEST MODE: SILENT"
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundTransparency = 1
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+Title.Parent = MainFrame
+
+-- Nút Bật/Tắt
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Name = "ToggleBtn"
+ToggleButton.Size = UDim2.new(0.8, 0, 0, 40)
+ToggleButton.Position = UDim2.new(0.1, 0, 0.4, 0)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- Màu đỏ (Tắt)
+ToggleButton.Text = "TRẠNG THÁI: TẮT"
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.Font = Enum.Font.Gotham
+ToggleButton.TextSize = 12
+ToggleButton.Parent = MainFrame
+
+local BtnCorner = Instance.new("UICorner")
+BtnCorner.CornerRadius = UDim.new(0, 6)
+BtnCorner.Parent = ToggleButton
+
+-- Vòng tròn FOV (Chỉ để nhìn thấy vùng hoạt động)
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Visible = Settings.Enabled
+FOVCircle.Radius = Settings.FOV
+FOVCircle.Color = Color3.fromRGB(255, 255, 255)
+FOVCircle.Thickness = 1
+FOVCircle.Filled = false
+FOVCircle.Transparency = 1
+
+-- /// LOGIC UI ///
+ToggleButton.MouseButton1Click:Connect(function()
+    Settings.Enabled = not Settings.Enabled
+    
+    if Settings.Enabled then
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50) -- Xanh lá
+        ToggleButton.Text = "TRẠNG THÁI: ĐANG CHẠY"
+        FOVCircle.Visible = true
     else
-        if esp then esp:Destroy() end
-    end
-
-    -- 2. MAGIC HITBOX & REDIRECT (Gom vào Combat)
-    local magic = head:FindFirstChild("Combat_Magic")
-    local shouldActivate = Config.Magic_Enabled and IsVisible(head)
-
-    if shouldActivate then
-        if not magic then
-            magic = Instance.new("Part")
-            magic.Name = "Combat_Magic"
-            magic.Transparency = 1
-            magic.CanCollide = false
-            magic.Massless = true
-            magic.CastShadow = false
-            
-            local weld = Instance.new("WeldConstraint")
-            weld.Part0 = head
-            weld.Part1 = magic
-            weld.Parent = magic
-            magic.Parent = head
-        end
-        
-        -- Cơ chế Jitter (Bảo mật cao)
-        local jitter = Config.Jitter_Mode and (math.random(-15, 15) / 100) or 0
-        local finalSize = Config.Hitbox_Size + jitter
-        magic.Size = Vector3.new(finalSize, finalSize, finalSize)
-    else
-        if magic then magic:Destroy() end
-    end
-end
-
--- // VÒNG LẶP RENDER //
-local MainLoop = RunService.RenderStepped:Connect(function()
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("Model") and Config.Target_NPCs[obj.Name] then
-            ProcessNPC(obj)
-        end
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- Đỏ
+        ToggleButton.Text = "TRẠNG THÁI: TẮT"
+        FOVCircle.Visible = false
     end
 end)
 
--- // GIAO DIỆN RAYFIELD V5 //
-local Window = Rayfield:CreateWindow({
-    Name = "TOKAI-HUB (ALL-IN-COMBAT)🛡️",
-    LoadingTitle = "Initializing Elite Script...",
-    LoadingSubtitle = "Male | Zombie | Zombies Specialist",
-    Theme = "Bloom",
-    ConfigurationSaving = { Enabled = false }
-})
+-- /// HÀM TÌM MỤC TIÊU GẦN NHẤT (GET CLOSEST TARGET) ///
+local function GetClosestPlayer()
+    local ClosestTarget = nil
+    local ShortestDistance = Settings.FOV
 
-local CombatTab = Window:CreateTab("Combat ⚔️")
-local VisualTab = Window:CreateTab("Visuals 👁️")
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 and v.Character:FindFirstChild(Settings.TargetPart) then
+            -- Check Đồng đội
+            if Settings.TeamCheck and v.Team == LocalPlayer.Team then
+                continue 
+            end
 
--- TẤT CẢ TÍNH NĂNG HITBOX NẰM Ở ĐÂY
-CombatTab:CreateSection("Magic Hitbox System")
+            -- Chuyển vị trí 3D sang 2D màn hình
+            local pos = Camera:WorldToViewportPoint(v.Character[Settings.TargetPart].Position)
+            local magnitude = (Vector2.new(pos.X, pos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
 
-CombatTab:CreateToggle({
-    Name = "Enable Magic Hitbox",
-    CurrentValue = false,
-    Callback = function(Value)
-        Config.Magic_Enabled = Value
-    end,
-})
+            if magnitude < ShortestDistance then
+                ClosestTarget = v
+                ShortestDistance = magnitude
+            end
+        end
+    end
+    return ClosestTarget
+end
 
-CombatTab:CreateSlider({
-    Name = "Hitbox Radius",
-    Min = 1,
-    Max = 30,
-    Default = 10,
-    Increment = 1,
-    ValueName = "Studs",
-    Callback = function(Value)
-        Config.Hitbox_Size = Value
-    end,
-})
-
-CombatTab:CreateSection("Safety & Anti-Ban")
-
-CombatTab:CreateToggle({
-    Name = "Anti-Wall (Bắt buộc bật)",
-    CurrentValue = true,
-    Callback = function(Value)
-        Config.Wall_Check = Value
-    end,
-})
-
-CombatTab:CreateToggle({
-    Name = "Security Jitter (Randomize)",
-    CurrentValue = true,
-    Callback = function(Value)
-        Config.Jitter_Mode = Value
-    end,
-})
-
--- TAB VISUALS CHO ESP
-VisualTab:CreateSection("ESP Display")
-
-VisualTab:CreateToggle({
-    Name = "Enable NPC ESP",
-    CurrentValue = false,
-    Callback = function(Value)
-        Config.ESP_Enabled = Value
-    end,
-})
-
-VisualTab:CreateSection("Settings")
-
-VisualTab:CreateButton({
-    Name = "Unload Script",
-    Callback = function()
-        MainLoop:Disconnect()
-        Rayfield:Destroy()
-    end,
-})
+-- /// VÒNG LẶP CHÍNH ///
+RunService.RenderStepped:Connect(function()
+    -- Cập nhật vị trí vòng tròn FOV theo chuột
+    FOVCircle.Position = Vector2.new(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y)
+    
+    if Settings.Enabled then
+        local Target = GetClosestPlayer()
+        if Target then
+            -- HIỆN TẠI: Chỉ in tên mục tiêu ra console để test logic
+            -- TƯƠNG LAI: Đây là nơi bạn đặt logic "Silent Aim"
+            
+            -- Ví dụ Logic (Dạng giả lập):
+            -- _G.SilentAimTarget = Target.Character[Settings.TargetPart]
+            
+            Title.Text = "LOCKED: " .. Target.Name -- Hiển thị tên kẻ địch đang bị nhắm trên UI
+            Title.TextColor3 = Color3.fromRGB(255, 50, 50)
+        else
+            Title.Text = "SCANNING..."
+            Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+        end
+    end
+end)

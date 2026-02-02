@@ -1,138 +1,134 @@
--- /// CẤU HÌNH CƠ BẢN ///
-local Settings = {
-    Enabled = false,       -- Bật/Tắt chức năng
-    FOV = 150,             -- Phạm vi hoạt động (vòng tròn quanh chuột)
-    TargetPart = "Head",   -- Phần cơ thể muốn nhắm vào
-    TeamCheck = true       -- Kiểm tra đồng đội (True = không nhắm đồng đội)
-}
-
--- /// DỊCH VỤ (SERVICES) ///
+-- /// CONFIG & SERVICES ///
+local Settings = { Hitbox = 15, WallCheck = true, Enabled = true }
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
+local Camera = workspace.CurrentCamera
 
--- /// TẠO UI TỰ CHẾ (CUSTOM UI - NO LIBRARY) ///
--- Xóa UI cũ nếu có để tránh trùng lặp
-if game.CoreGui:FindFirstChild("MyCustomAimUI") then
-    game.CoreGui.MyCustomAimUI:Destroy()
-end
+-- /// TẠO UI (SELF-MADE) ///
+local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+ScreenGui.Name = "ZomHub_Mini"
+ScreenGui.ResetOnSpawn = false
 
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "MyCustomAimUI"
-ScreenGui.Parent = game.CoreGui -- Đưa vào CoreGui để không bị reset khi chết
-
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 200, 0, 120)
-MainFrame.Position = UDim2.new(0.5, -100, 0.5, -60)
-MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35) -- Màu xám tối
+-- Menu Chính
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 180, 0, 200)
+MainFrame.Position = UDim2.new(0.5, -90, 0.4, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
-MainFrame.Draggable = true -- Cho phép kéo thả bảng
-MainFrame.Parent = ScreenGui
+MainFrame.Draggable = true -- Có thể kéo
 
--- Bo tròn góc
-local UICorner = Instance.new("UICorner")
+local UICorner = Instance.new("UICorner", MainFrame)
 UICorner.CornerRadius = UDim.new(0, 8)
-UICorner.Parent = MainFrame
 
--- Tiêu đề
-local Title = Instance.new("TextLabel")
-Title.Text = "TEST MODE: SILENT"
+-- Title
+local Title = Instance.new("TextLabel", MainFrame)
 Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Text = "ZOM-HUB v1"
+Title.TextColor3 = Color3.new(1, 1, 1)
 Title.BackgroundTransparency = 1
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 14
-Title.Parent = MainFrame
 
--- Nút Bật/Tắt
-local ToggleButton = Instance.new("TextButton")
-ToggleButton.Name = "ToggleBtn"
-ToggleButton.Size = UDim2.new(0.8, 0, 0, 40)
-ToggleButton.Position = UDim2.new(0.1, 0, 0.4, 0)
-ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- Màu đỏ (Tắt)
-ToggleButton.Text = "TRẠNG THÁI: TẮT"
-ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleButton.Font = Enum.Font.Gotham
-ToggleButton.TextSize = 12
-ToggleButton.Parent = MainFrame
+-- Nút Thu Nhỏ (X)
+local CloseBtn = Instance.new("TextButton", MainFrame)
+CloseBtn.Size = UDim2.new(0, 25, 0, 25)
+CloseBtn.Position = UDim2.new(1, -30, 0, 5)
+CloseBtn.Text = "-"
+CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseBtn.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", CloseBtn)
 
-local BtnCorner = Instance.new("UICorner")
-BtnCorner.CornerRadius = UDim.new(0, 6)
-BtnCorner.Parent = ToggleButton
+-- Nút Mở Nhanh (Nút nổi khi thu nhỏ)
+local OpenBtn = Instance.new("TextButton", ScreenGui)
+OpenBtn.Size = UDim2.new(0, 40, 0, 40)
+OpenBtn.Position = UDim2.new(0, 10, 0.5, 0)
+OpenBtn.Text = "🎯"
+OpenBtn.Visible = false
+OpenBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+OpenBtn.Draggable = true
+Instance.new("UICorner", OpenBtn).CornerRadius = UDim.new(1, 0)
 
--- Vòng tròn FOV (Chỉ để nhìn thấy vùng hoạt động)
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Visible = Settings.Enabled
-FOVCircle.Radius = Settings.FOV
-FOVCircle.Color = Color3.fromRGB(255, 255, 255)
-FOVCircle.Thickness = 1
-FOVCircle.Filled = false
-FOVCircle.Transparency = 1
-
--- /// LOGIC UI ///
-ToggleButton.MouseButton1Click:Connect(function()
-    Settings.Enabled = not Settings.Enabled
+-- Hàm tạo Nút Bật/Tắt trong Menu
+local function CreateToggle(name, pos, default, callback)
+    local btn = Instance.new("TextButton", MainFrame)
+    btn.Size = UDim2.new(0.8, 0, 0, 35)
+    btn.Position = UDim2.new(0.1, 0, 0, pos)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 14
     
-    if Settings.Enabled then
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50) -- Xanh lá
-        ToggleButton.Text = "TRẠNG THÁI: ĐANG CHẠY"
-        FOVCircle.Visible = true
-    else
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- Đỏ
-        ToggleButton.Text = "TRẠNG THÁI: TẮT"
-        FOVCircle.Visible = false
+    local function update()
+        btn.Text = name .. ": " .. (default and "ON" or "OFF")
+        btn.BackgroundColor3 = default and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(60, 60, 60)
+        btn.TextColor3 = Color3.new(1,1,1)
     end
-end)
-
--- /// HÀM TÌM MỤC TIÊU GẦN NHẤT (GET CLOSEST TARGET) ///
-local function GetClosestPlayer()
-    local ClosestTarget = nil
-    local ShortestDistance = Settings.FOV
-
-    for _, v in pairs(Players:GetPlayers()) do
-        if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 and v.Character:FindFirstChild(Settings.TargetPart) then
-            -- Check Đồng đội
-            if Settings.TeamCheck and v.Team == LocalPlayer.Team then
-                continue 
-            end
-
-            -- Chuyển vị trí 3D sang 2D màn hình
-            local pos = Camera:WorldToViewportPoint(v.Character[Settings.TargetPart].Position)
-            local magnitude = (Vector2.new(pos.X, pos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
-
-            if magnitude < ShortestDistance then
-                ClosestTarget = v
-                ShortestDistance = magnitude
-            end
-        end
-    end
-    return ClosestTarget
+    
+    btn.MouseButton1Click:Connect(function()
+        default = not default
+        update()
+        callback(default)
+    end)
+    update()
+    Instance.new("UICorner", btn)
 end
 
--- /// VÒNG LẶP CHÍNH ///
-RunService.RenderStepped:Connect(function()
-    -- Cập nhật vị trí vòng tròn FOV theo chuột
-    FOVCircle.Position = Vector2.new(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y)
-    
-    if Settings.Enabled then
-        local Target = GetClosestPlayer()
-        if Target then
-            -- HIỆN TẠI: Chỉ in tên mục tiêu ra console để test logic
-            -- TƯƠNG LAI: Đây là nơi bạn đặt logic "Silent Aim"
-            
-            -- Ví dụ Logic (Dạng giả lập):
-            -- _G.SilentAimTarget = Target.Character[Settings.TargetPart]
-            
-            Title.Text = "LOCKED: " .. Target.Name -- Hiển thị tên kẻ địch đang bị nhắm trên UI
-            Title.TextColor3 = Color3.fromRGB(255, 50, 50)
-        else
-            Title.Text = "SCANNING..."
-            Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+-- /// SỰ KIỆN NÚT ///
+CreateToggle("Silent Aim", 45, Settings.Enabled, function(v) Settings.Enabled = v end)
+CreateToggle("Wall Check", 90, Settings.WallCheck, function(v) Settings.WallCheck = v end)
+CreateToggle("Hitbox 15/20", 135, true, function(v) Settings.Hitbox = v and 15 or 5 end)
+
+CloseBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = false
+    OpenBtn.Visible = true
+end)
+
+OpenBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = true
+    OpenBtn.Visible = false
+end)
+
+-- /// LOGIC BẮN (BẢN ANTI-BAN) ///
+local function IsVisible(part)
+    if not Settings.WallCheck then return true end
+    local rayParam = RaycastParams.new()
+    rayParam.FilterType = Enum.RaycastFilterType.Exclude
+    rayParam.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
+    local result = workspace:Raycast(Camera.CFrame.Position, (part.Position - Camera.CFrame.Position).Unit * 500, rayParam)
+    return result and result.Instance:IsDescendantOf(part.Parent)
+end
+
+local function GetTarget()
+    if not Settings.Enabled then return nil end
+    local Best, Closest = nil, Settings.Hitbox * 18
+    for _, v in pairs(workspace:GetChildren()) do
+        if (v.Name:find("Zombie") or v.Name:find("Male")) and v:FindFirstChild("Head") and v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 then
+            local Head = v.Head
+            local Pos, OnScreen = Camera:WorldToViewportPoint(Head.Position)
+            if OnScreen then
+                local Dist = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(Pos.X, Pos.Y)).Magnitude
+                if Dist < Closest and IsVisible(Head) then
+                    Closest = Dist
+                    Best = Head
+                end
+            end
         end
     end
+    return Best
+end
+
+-- Hook hệ thống
+local mt = getrawmetatable(game)
+local old = mt.__index
+setreadonly(mt, false)
+mt.__index = newcclosure(function(self, idx)
+    if self == Mouse and (idx == "Hit" or idx == "Target") and Settings.Enabled then
+        local T = GetTarget()
+        if T then return (idx == "Hit" and T.CFrame or T) end
+    end
+    return old(self, idx)
 end)
+setreadonly(mt, true)
+
+print("UI Loaded: Sử dụng nút tròn bên trái để mở Menu!")

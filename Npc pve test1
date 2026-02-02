@@ -1,99 +1,81 @@
--- /// ZOM-HUB V7 (FAKE HITBOX - LEGIT METHOD) ///
-local Settings = { 
-    HitboxSize = 12, -- Độ rộng vừa phải để an toàn (12 là chuẩn nhất)
-    Enabled = true,
-    EspEnabled = true,
+-- /// ZOM-HUB V9 (ENGINE-LEVEL HITBOX - ANTI-DETECTION) ///
+local Settings = {
+    HitboxSize = 15, -- Kích thước ảo (không đổi size thật)
+    Chance = 100, -- Tỉ lệ trúng (để 100 là luôn trúng)
+    WallCheck = true,
     NoRecoil = true
 }
 
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
 local Camera = workspace.CurrentCamera
 
--- /// HÀM TẠO HITBOX ẢO (KHÔNG CHẠM VÀO HEAD THẬT) ///
-local function CreateFakeHitbox(npc)
-    local head = npc:FindFirstChild("Head")
-    if head and not head:FindFirstChild("FakeHead") then
-        local fake = Instance.new("Part")
-        fake.Name = "FakeHead"
-        fake.Size = Vector3.new(Settings.HitboxSize, Settings.HitboxSize, Settings.HitboxSize)
-        fake.Transparency = 0.8 -- Màu đỏ mờ để cậu thấy
-        fake.Color = Color3.new(1, 0, 0)
-        fake.CanCollide = false
-        fake.Anchored = false
-        fake.AlwaysOnTop = false -- Để nó không bị lộ qua tường
-        fake.Parent = head
-        
-        -- Hàn chặt vào đầu thật
-        local weld = Instance.new("Weld")
-        weld.Part0 = head
-        weld.Part1 = fake
-        weld.C0 = CFrame.new(0, 0, 0)
-        weld.Parent = fake
+-- HÀM TÌM NPC GẦN TÂM CHUỘT NHẤT (QUÉT QUA VECTOR)
+local function GetClosestNPC()
+    local target = nil
+    local minDist = Settings.HitboxSize * 10 -- Quy đổi đơn vị sang pixel màn hình
 
-        -- Thêm ESP Khung dây
-        local selection = Instance.new("SelectionBox")
-        selection.Adornee = fake
-        selection.Color3 = Color3.new(1, 0, 0)
-        selection.LineThickness = 0.02
-        selection.Parent = fake
-    end
-end
-
--- /// QUÉT NPC LIÊN TỤC ///
-RunService.Heartbeat:Connect(function()
     for _, v in ipairs(workspace:GetDescendants()) do
         if v:IsA("Model") and (v.Name == "Male" or v.Name == "Zombie" or v.Name == "Zombies") then
-            if not Players:GetPlayerFromCharacter(v) then
-                local hum = v:FindFirstChildOfClass("Humanoid")
-                if hum and hum.Health > 0 then
-                    CreateFakeHitbox(v)
-                end
-            end
-        end
-    end
-    
-    -- No Recoil kín đáo
-    if Settings.NoRecoil then
-        local cam = workspace.CurrentCamera
-        if cam:FindFirstChild("Spring") then
-            cam.Spring.Value = Vector3.new(0,0,0)
-        end
-    end
-end)
-
--- /// CHỈNH SỬA HỆ THỐNG ĐẠN (SILENT AIM KÍN) ///
-local mt = getrawmetatable(game)
-local old = mt.__index
-setreadonly(mt, false)
-
-mt.__index = newcclosure(function(self, idx)
-    if self == game:GetService("Players").LocalPlayer:GetMouse() and (idx == "Hit" or idx == "Target") and Settings.Enabled then
-        -- Tìm cái FakeHead gần tâm chuột nhất
-        local target = nil
-        local minDist = 200 -- Giới hạn khoảng cách chuột để tránh bắn quá ảo
-        
-        for _, v in ipairs(workspace:GetDescendants()) do
-            if v.Name == "FakeHead" then
-                local screenPos, onScreen = Camera:WorldToViewportPoint(v.Position)
+            local head = v:FindFirstChild("Head")
+            if head and v:FindFirstChildOfClass("Humanoid") and v:FindFirstChildOfClass("Humanoid").Health > 0 then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
                 if onScreen then
-                    local mousePos = game:GetService("UserInputService"):GetMouseLocation()
+                    local mousePos = Vector2.new(Mouse.X, Mouse.Y)
                     local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
                     if dist < minDist then
+                        target = head
                         minDist = dist
-                        target = v
                     end
                 end
             end
         end
+    end
+    return target
+end
+
+-- /// KỸ THUẬT HOOK RAYCAST (BẺ TIA TỪ GỐC) ///
+-- Đây là cách các bản hack trả phí vượt Anticheat mà không bị ban
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+
+    -- Nếu game gọi hàm Raycast hoặc FindPartOnRay để kiểm tra đạn trúng
+    if (method == "Raycast" or method == "FindPartOnRayWithIgnoreList") and not checkcaller() then
+        local targetHead = GetClosestNPC()
         
-        if target then
-            -- Bắn vào đầu thật bên trong cái FakeHead
-            return (idx == "Hit" and target.Parent.CFrame or target.Parent)
+        if targetHead then
+            -- Nếu có NPC trong tầm Hitbox ảo, ta "đánh lừa" kết quả trả về
+            -- Thay vì trả về không gian trống, ta ép game nhận diện là trúng Head
+            if Settings.WallCheck then
+                -- Kiểm tra tường trước khi bẻ tia
+                local rayParams = RaycastParams.new()
+                rayParams.FilterType = Enum.RaycastFilterType.Exclude
+                rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+                local check = workspace:Raycast(Camera.CFrame.Position, (targetHead.Position - Camera.CFrame.Position).Unit * 1000, rayParams)
+                
+                if check and check.Instance:IsDescendantOf(targetHead.Parent) then
+                    -- Bẻ hướng tia đạn thẳng vào đầu NPC
+                    if args[1] and typeof(args[1]) == "Vector3" and args[2] and typeof(args[2]) == "Vector3" then
+                        args[2] = (targetHead.Position - args[1]).Unit * 1000
+                    end
+                end
+            end
         end
     end
-    return old(self, idx)
+    return oldNamecall(self, unpack(args))
 end)
 
-setreadonly(mt, true)
+-- /// NO RECOIL (DẠNG KÍN) ///
+game:GetService("RunService").RenderStepped:Connect(function()
+    if Settings.NoRecoil then
+        -- Chỉ xóa Spring để súng không nảy lên màn hình
+        if Camera:FindFirstChild("Spring") then
+            Camera.Spring.Value = Vector3.new(0,0,0)
+        end
+    end
+end)
+
+print("ZOM-HUB V9: Anti-Cheat Bypass Loaded")

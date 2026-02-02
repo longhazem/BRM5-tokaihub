@@ -1,141 +1,99 @@
--- /// ZOM-HUB V4.5 (ANTI-DETECTION) ///
+-- /// ZOM-HUB V7 (FAKE HITBOX - LEGIT METHOD) ///
 local Settings = { 
-    Hitbox = 15, 
-    WallCheck = true, 
-    Enabled = true, 
+    HitboxSize = 12, -- Độ rộng vừa phải để an toàn (12 là chuẩn nhất)
+    Enabled = true,
     EspEnabled = true,
-    NoRecoil = true,
-    Smoothness = 0.5 -- Độ mượt: Càng cao càng khó bị phát hiện
+    NoRecoil = true
 }
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
 local Camera = workspace.CurrentCamera
 
-local ValidTargets = {}
+-- /// HÀM TẠO HITBOX ẢO (KHÔNG CHẠM VÀO HEAD THẬT) ///
+local function CreateFakeHitbox(npc)
+    local head = npc:FindFirstChild("Head")
+    if head and not head:FindFirstChild("FakeHead") then
+        local fake = Instance.new("Part")
+        fake.Name = "FakeHead"
+        fake.Size = Vector3.new(Settings.HitboxSize, Settings.HitboxSize, Settings.HitboxSize)
+        fake.Transparency = 0.8 -- Màu đỏ mờ để cậu thấy
+        fake.Color = Color3.new(1, 0, 0)
+        fake.CanCollide = false
+        fake.Anchored = false
+        fake.AlwaysOnTop = false -- Để nó không bị lộ qua tường
+        fake.Parent = head
+        
+        -- Hàn chặt vào đầu thật
+        local weld = Instance.new("Weld")
+        weld.Part0 = head
+        weld.Part1 = fake
+        weld.C0 = CFrame.new(0, 0, 0)
+        weld.Parent = fake
 
--- /// HÀM KIỂM TRA NPC ///
-local function IsTargetNPC(obj)
-    if Players:GetPlayerFromCharacter(obj) then return false end
-    local names = {["Male"] = true, ["Zombie"] = true, ["Zombies"] = true}
-    return names[obj.Name] or false
-end
-
--- /// HITBOX ĐỎ & HIỆN MẶT NPC ///
-local function ApplyVisualHitbox(v)
-    local head = v:FindFirstChild("Head")
-    if not head then return end
-
-    if Settings.Enabled then
-        head.Size = Vector3.new(Settings.Hitbox, Settings.Hitbox, Settings.Hitbox)
-        head.Color = Color3.fromRGB(255, 0, 0)
-        head.Transparency = 0.7 -- Tăng độ trong suốt để khó bị admin soi
-        head.CanCollide = false
-    else
-        head.Size = Vector3.new(1.2, 1.2, 1.2)
-        head.Transparency = 0
-    end
-
-    -- Giữ mặt NPC để biết hướng nhìn
-    for _, face in ipairs(head:GetChildren()) do
-        if face:IsA("Decal") then
-            face.Transparency = 0
-            face.ZIndexMode = Enum.ZIndexMode.Global
-        end
+        -- Thêm ESP Khung dây
+        local selection = Instance.new("SelectionBox")
+        selection.Adornee = fake
+        selection.Color3 = Color3.new(1, 0, 0)
+        selection.LineThickness = 0.02
+        selection.Parent = fake
     end
 end
 
--- /// VÒNG LẶP QUÉT VÀ NO RECOIL ///
+-- /// QUÉT NPC LIÊN TỤC ///
 RunService.Heartbeat:Connect(function()
     for _, v in ipairs(workspace:GetDescendants()) do
-        if v:IsA("Model") and IsTargetNPC(v) then
-            local hum = v:FindFirstChildOfClass("Humanoid")
-            if hum and hum.Health > 0 then
-                ApplyVisualHitbox(v)
-                ValidTargets[v] = v.Head
+        if v:IsA("Model") and (v.Name == "Male" or v.Name == "Zombie" or v.Name == "Zombies") then
+            if not Players:GetPlayerFromCharacter(v) then
+                local hum = v:FindFirstChildOfClass("Humanoid")
+                if hum and hum.Health > 0 then
+                    CreateFakeHitbox(v)
+                end
             end
         end
     end
     
+    -- No Recoil kín đáo
     if Settings.NoRecoil then
         local cam = workspace.CurrentCamera
-        if cam:FindFirstChild("Spring") then cam.Spring.Value = Vector3.new(0,0,0) end
+        if cam:FindFirstChild("Spring") then
+            cam.Spring.Value = Vector3.new(0,0,0)
+        end
     end
 end)
 
--- /// SILENT AIM CÓ CƠ CHẾ ANTI-DETECTION ///
+-- /// CHỈNH SỬA HỆ THỐNG ĐẠN (SILENT AIM KÍN) ///
 local mt = getrawmetatable(game)
 local old = mt.__index
 setreadonly(mt, false)
 
 mt.__index = newcclosure(function(self, idx)
-    if self == Mouse and (idx == "Hit" or idx == "Target") and Settings.Enabled then
-        local Best, Closest = nil, 400 -- Giới hạn tầm quét để tránh bẻ đạn quá xa (lộ)
+    if self == game:GetService("Players").LocalPlayer:GetMouse() and (idx == "Hit" or idx == "Target") and Settings.Enabled then
+        -- Tìm cái FakeHead gần tâm chuột nhất
+        local target = nil
+        local minDist = 200 -- Giới hạn khoảng cách chuột để tránh bắn quá ảo
         
-        for npc, head in pairs(ValidTargets) do
-            if head.Parent and npc:FindFirstChildOfClass("Humanoid").Health > 0 then
-                local pos, on = Camera:WorldToViewportPoint(head.Position)
-                if on then
-                    local dist = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(pos.X, pos.Y)).Magnitude
-                    if dist < Closest then
-                        if Settings.WallCheck then
-                            local ray = RaycastParams.new()
-                            ray.FilterType = Enum.RaycastFilterType.Exclude
-                            ray.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
-                            local res = workspace:Raycast(Camera.CFrame.Position, (head.Position - Camera.CFrame.Position).Unit * 1000, ray)
-                            if res and res.Instance:IsDescendantOf(npc) then Best = head end
-                        else
-                            Best = head
-                        end
+        for _, v in ipairs(workspace:GetDescendants()) do
+            if v.Name == "FakeHead" then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(v.Position)
+                if onScreen then
+                    local mousePos = game:GetService("UserInputService"):GetMouseLocation()
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    if dist < minDist then
+                        minDist = dist
+                        target = v
                     end
                 end
             end
         end
         
-        if Best then
-            -- ANTI-DETECTION LOGIC: Tạo điểm bắn ngẫu nhiên trong Hitbox
-            -- Thay vì bắn vào 0,0,0 của Head, ta bắn lệch đi một chút
-            local randomOffset = Vector3.new(
-                math.random(-2, 2), 
-                math.random(-2, 2), 
-                math.random(-2, 2)
-            )
-            local targetCFrame = Best.CFrame * CFrame.new(randomOffset)
-            
-            return (idx == "Hit" and targetCFrame or Best)
+        if target then
+            -- Bắn vào đầu thật bên trong cái FakeHead
+            return (idx == "Hit" and target.Parent.CFrame or target.Parent)
         end
     end
     return old(self, idx)
 end)
 
 setreadonly(mt, true)
-
--- /// UI MINI ///
-local ScreenGui = Instance.new("ScreenGui", LocalPlayer.PlayerGui)
-local Main = Instance.new("Frame", ScreenGui)
-Main.Size = UDim2.new(0, 180, 0, 160)
-Main.Position = UDim2.new(0.5, -90, 0.4, 0)
-Main.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-Main.Draggable = true
-Main.Active = true
-Instance.new("UICorner", Main)
-
-local function CreateToggle(name, pos, default, callback)
-    local btn = Instance.new("TextButton", Main)
-    btn.Size = UDim2.new(0.9, 0, 0, 35)
-    btn.Position = UDim2.new(0.05, 0, 0, pos)
-    local function up()
-        btn.Text = name..": "..(default and "ON" or "OFF")
-        btn.BackgroundColor3 = default and Color3.fromRGB(0, 120, 255) or Color3.fromRGB(50, 50, 50)
-        btn.TextColor3 = Color3.new(1,1,1)
-    end
-    btn.MouseButton1Click:Connect(function() default = not default; up(); callback(default) end)
-    up()
-    Instance.new("UICorner", btn)
-end
-
-CreateToggle("Hitbox NPC", 15, Settings.Enabled, function(v) Settings.Enabled = v end)
-CreateToggle("No Recoil", 60, Settings.NoRecoil, function(v) Settings.NoRecoil = v end)
-CreateToggle("Safe Mode", 105, true, function(v) Settings.WallCheck = v end)

@@ -1,158 +1,141 @@
--- /// CONFIG & SERVICES ///
+-- /// ZOM-HUB V4.5 (ANTI-DETECTION) ///
 local Settings = { 
     Hitbox = 15, 
     WallCheck = true, 
     Enabled = true, 
-    EspEnabled = true 
+    EspEnabled = true,
+    NoRecoil = true,
+    Smoothness = 0.5 -- Độ mượt: Càng cao càng khó bị phát hiện
 }
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 local Camera = workspace.CurrentCamera
 
-local EspObjects = {} -- Lưu trữ ESP
+local ValidTargets = {}
 
--- /// HÀM XỬ LÝ ESP TỪNG NPC ///
-local function ApplyEsp(model)
-    if not model:FindFirstChild("Head") then return end
-    local head = model.Head
-    
-    -- Nếu đã có ESP rồi thì chỉ cập nhật hiển thị
-    local existingEsp = head:FindFirstChild("ZomEsp")
-    if existingEsp then
-        existingEsp.Visible = Settings.EspEnabled
-        return 
-    end
+-- /// HÀM KIỂM TRA NPC ///
+local function IsTargetNPC(obj)
+    if Players:GetPlayerFromCharacter(obj) then return false end
+    local names = {["Male"] = true, ["Zombie"] = true, ["Zombies"] = true}
+    return names[obj.Name] or false
+end
 
-    -- Tạo mới nếu chưa có
-    local box = Instance.new("BoxHandleAdornment")
-    box.Name = "ZomEsp"
-    box.Adornee = head
-    box.AlwaysOnTop = true
-    box.ZIndex = 5
-    box.Size = Vector3.new(1.3, 1.3, 1.3) -- Kích thước cố định (Fix lỗi phóng to)
-    
-    -- Phân màu
-    if model.Name == "Male" then
-        box.Color3 = Color3.fromRGB(0, 255, 0) -- Xanh lá
+-- /// HITBOX ĐỎ & HIỆN MẶT NPC ///
+local function ApplyVisualHitbox(v)
+    local head = v:FindFirstChild("Head")
+    if not head then return end
+
+    if Settings.Enabled then
+        head.Size = Vector3.new(Settings.Hitbox, Settings.Hitbox, Settings.Hitbox)
+        head.Color = Color3.fromRGB(255, 0, 0)
+        head.Transparency = 0.7 -- Tăng độ trong suốt để khó bị admin soi
+        head.CanCollide = false
     else
-        box.Color3 = Color3.fromRGB(255, 0, 0) -- Đỏ (Zombie, Zombies)
+        head.Size = Vector3.new(1.2, 1.2, 1.2)
+        head.Transparency = 0
     end
 
-    box.Transparency = 0.5
-    box.Visible = Settings.EspEnabled
-    box.Parent = head
-    table.insert(EspObjects, head)
-end
-
--- /// UI LIBRARY (ZOM-HUB V3.2) ///
-local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-ScreenGui.Name = "ZomHub_V3_Final"
-ScreenGui.ResetOnSpawn = false
-
-local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 180, 0, 240)
-MainFrame.Position = UDim2.new(0.5, -90, 0.4, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-MainFrame.Draggable = true
-MainFrame.Active = true
-Instance.new("UICorner", MainFrame)
-
-local Title = Instance.new("TextLabel", MainFrame)
-Title.Size = UDim2.new(1, 0, 0, 35)
-Title.Text = "ZOM-HUB V3.2"
-Title.TextColor3 = Color3.new(1, 1, 1)
-Title.BackgroundTransparency = 1
-Title.Font = Enum.Font.GothamBold
-
-local CloseBtn = Instance.new("TextButton", MainFrame)
-CloseBtn.Size = UDim2.new(0, 25, 0, 25)
-CloseBtn.Position = UDim2.new(1, -30, 0, 5)
-CloseBtn.Text = "X"
-CloseBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
-CloseBtn.TextColor3 = Color3.new(1, 1, 1)
-Instance.new("UICorner", CloseBtn)
-
-local OpenBtn = Instance.new("TextButton", ScreenGui)
-OpenBtn.Size = UDim2.new(0, 45, 0, 45)
-OpenBtn.Position = UDim2.new(0, 10, 0.5, 0)
-OpenBtn.Text = "🎯"
-OpenBtn.Visible = false
-OpenBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-Instance.new("UICorner", OpenBtn).CornerRadius = UDim.new(1, 0)
-
-local function CreateToggle(name, pos, default, callback)
-    local btn = Instance.new("TextButton", MainFrame)
-    btn.Size = UDim2.new(0.85, 0, 0, 35)
-    btn.Position = UDim2.new(0.075, 0, 0, pos)
-    btn.Font = Enum.Font.Gotham
-    local function update()
-        btn.Text = name .. ": " .. (default and "ON" or "OFF")
-        btn.BackgroundColor3 = default and Color3.fromRGB(0, 120, 255) or Color3.fromRGB(50, 50, 50)
-        btn.TextColor3 = Color3.new(1,1,1)
+    -- Giữ mặt NPC để biết hướng nhìn
+    for _, face in ipairs(head:GetChildren()) do
+        if face:IsA("Decal") then
+            face.Transparency = 0
+            face.ZIndexMode = Enum.ZIndexMode.Global
+        end
     end
-    btn.MouseButton1Click:Connect(function() default = not default; update(); callback(default) end)
-    update()
-    Instance.new("UICorner", btn)
 end
 
-CreateToggle("Silent Aim", 45, Settings.Enabled, function(v) Settings.Enabled = v end)
-CreateToggle("Full ESP", 90, Settings.EspEnabled, function(v) Settings.EspEnabled = v end)
-CreateToggle("Wall Check", 135, Settings.WallCheck, function(v) Settings.WallCheck = v end)
-CreateToggle("Hitbox 15", 180, true, function(v) Settings.Hitbox = v and 15 or 2 end)
-
-CloseBtn.MouseButton1Click:Connect(function() MainFrame.Visible = false; OpenBtn.Visible = true end)
-OpenBtn.MouseButton1Click:Connect(function() MainFrame.Visible = true; OpenBtn.Visible = false end)
-
--- /// VÒNG LẶP QUÉT TOÀN BỘ WORKSPACE (FIX LỖI THIẾU NPC) ///
+-- /// VÒNG LẶP QUÉT VÀ NO RECOIL ///
 RunService.Heartbeat:Connect(function()
-    for _, v in ipairs(workspace:GetChildren()) do
-        if (v.Name == "Male" or v.Name == "Zombie" or v.Name == "Zombies") then
+    for _, v in ipairs(workspace:GetDescendants()) do
+        if v:IsA("Model") and IsTargetNPC(v) then
             local hum = v:FindFirstChildOfClass("Humanoid")
             if hum and hum.Health > 0 then
-                ApplyEsp(v)
+                ApplyVisualHitbox(v)
+                ValidTargets[v] = v.Head
             end
         end
+    end
+    
+    if Settings.NoRecoil then
+        local cam = workspace.CurrentCamera
+        if cam:FindFirstChild("Spring") then cam.Spring.Value = Vector3.new(0,0,0) end
     end
 end)
 
--- /// LOGIC SILENT AIM ///
-local function IsVisible(part)
-    if not Settings.WallCheck then return true end
-    local ray = RaycastParams.new()
-    ray.FilterType = Enum.RaycastFilterType.Exclude
-    ray.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
-    local res = workspace:Raycast(Camera.CFrame.Position, (part.Position - Camera.CFrame.Position).Unit * 1000, ray)
-    return res and res.Instance:IsDescendantOf(part.Parent)
-end
-
-local function GetTarget()
-    if not Settings.Enabled then return nil end
-    local Best, Closest = nil, Settings.Hitbox * 20
-    for _, head in ipairs(EspObjects) do
-        if head and head.Parent and head.Parent:FindFirstChild("Humanoid") and head.Parent.Humanoid.Health > 0 then
-            local Pos, OnScreen = Camera:WorldToViewportPoint(head.Position)
-            if OnScreen then
-                local Dist = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(Pos.X, Pos.Y)).Magnitude
-                if Dist < Closest and IsVisible(head) then
-                    Closest = Dist
-                    Best = head
-                end
-            end
-        end
-    end
-    return Best
-end
-
+-- /// SILENT AIM CÓ CƠ CHẾ ANTI-DETECTION ///
 local mt = getrawmetatable(game)
 local old = mt.__index
 setreadonly(mt, false)
+
 mt.__index = newcclosure(function(self, idx)
     if self == Mouse and (idx == "Hit" or idx == "Target") and Settings.Enabled then
-        local T = GetTarget()
-        if T then return (idx == "Hit" and T.CFrame or T) end
+        local Best, Closest = nil, 400 -- Giới hạn tầm quét để tránh bẻ đạn quá xa (lộ)
+        
+        for npc, head in pairs(ValidTargets) do
+            if head.Parent and npc:FindFirstChildOfClass("Humanoid").Health > 0 then
+                local pos, on = Camera:WorldToViewportPoint(head.Position)
+                if on then
+                    local dist = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(pos.X, pos.Y)).Magnitude
+                    if dist < Closest then
+                        if Settings.WallCheck then
+                            local ray = RaycastParams.new()
+                            ray.FilterType = Enum.RaycastFilterType.Exclude
+                            ray.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
+                            local res = workspace:Raycast(Camera.CFrame.Position, (head.Position - Camera.CFrame.Position).Unit * 1000, ray)
+                            if res and res.Instance:IsDescendantOf(npc) then Best = head end
+                        else
+                            Best = head
+                        end
+                    end
+                end
+            end
+        end
+        
+        if Best then
+            -- ANTI-DETECTION LOGIC: Tạo điểm bắn ngẫu nhiên trong Hitbox
+            -- Thay vì bắn vào 0,0,0 của Head, ta bắn lệch đi một chút
+            local randomOffset = Vector3.new(
+                math.random(-2, 2), 
+                math.random(-2, 2), 
+                math.random(-2, 2)
+            )
+            local targetCFrame = Best.CFrame * CFrame.new(randomOffset)
+            
+            return (idx == "Hit" and targetCFrame or Best)
+        end
     end
     return old(self, idx)
 end)
+
 setreadonly(mt, true)
+
+-- /// UI MINI ///
+local ScreenGui = Instance.new("ScreenGui", LocalPlayer.PlayerGui)
+local Main = Instance.new("Frame", ScreenGui)
+Main.Size = UDim2.new(0, 180, 0, 160)
+Main.Position = UDim2.new(0.5, -90, 0.4, 0)
+Main.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Main.Draggable = true
+Main.Active = true
+Instance.new("UICorner", Main)
+
+local function CreateToggle(name, pos, default, callback)
+    local btn = Instance.new("TextButton", Main)
+    btn.Size = UDim2.new(0.9, 0, 0, 35)
+    btn.Position = UDim2.new(0.05, 0, 0, pos)
+    local function up()
+        btn.Text = name..": "..(default and "ON" or "OFF")
+        btn.BackgroundColor3 = default and Color3.fromRGB(0, 120, 255) or Color3.fromRGB(50, 50, 50)
+        btn.TextColor3 = Color3.new(1,1,1)
+    end
+    btn.MouseButton1Click:Connect(function() default = not default; up(); callback(default) end)
+    up()
+    Instance.new("UICorner", btn)
+end
+
+CreateToggle("Hitbox NPC", 15, Settings.Enabled, function(v) Settings.Enabled = v end)
+CreateToggle("No Recoil", 60, Settings.NoRecoil, function(v) Settings.NoRecoil = v end)
+CreateToggle("Safe Mode", 105, true, function(v) Settings.WallCheck = v end)

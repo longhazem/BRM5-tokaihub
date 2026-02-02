@@ -1,75 +1,116 @@
--- /// ZOM-HUB V10 (SUPER SMOOTH & ANTI-CHEAT BYPASS) ///
+-- /// ZOM-HUB V11 (STABLE UI & ANTI-CHEAT FOCUS) ///
 local Settings = {
-    HitboxSize = 12, -- Kích thước ảo (Cực kỳ an toàn)
+    HitboxSize = 12,
     Enabled = true,
-    NoRecoil = true
+    NoRecoil = true,
+    ShowVisual = true -- Hiện khung đỏ quanh đầu để cậu biết hitbox ở đâu
 }
 
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 local Camera = workspace.CurrentCamera
 
--- Tối ưu hóa: Chỉ quét NPC 1 lần mỗi giây thay vì mỗi khung hình
-local ValidNPCs = {}
+-- /// TẠO UI (GỌN NHẸ) ///
+local ScreenGui = Instance.new("ScreenGui", LocalPlayer.PlayerGui)
+ScreenGui.Name = "ZomHub_Safe"
+ScreenGui.ResetOnSpawn = false
+
+local Main = Instance.new("Frame", ScreenGui)
+Main.Size = UDim2.new(0, 160, 0, 130)
+Main.Position = UDim2.new(0.1, 0, 0.4, 0)
+Main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.Draggable = true
+Instance.new("UICorner", Main).CornerRadius = Radius.new(0, 8)
+
+local Title = Instance.new("TextLabel", Main)
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Text = "ZOM-HUB V11"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.BackgroundTransparency = 1
+Title.Font = Enum.Font.SourceSansBold
+
+local function CreateBtn(name, pos, settingName)
+    local btn = Instance.new("TextButton", Main)
+    btn.Size = UDim2.new(0.9, 0, 0, 35)
+    btn.Position = UDim2.new(0.05, 0, 0, pos)
+    btn.BackgroundColor3 = Settings[settingName] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
+    btn.Text = name .. ": " .. (Settings[settingName] and "ON" or "OFF")
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    Instance.new("UICorner", btn)
+
+    btn.MouseButton1Click:Connect(function()
+        Settings[settingName] = not Settings[settingName]
+        btn.Text = name .. ": " .. (Settings[settingName] and "ON" or "OFF")
+        btn.BackgroundColor3 = Settings[settingName] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
+    end)
+end
+
+CreateBtn("Hitbox NPC", 40, "Enabled")
+CreateBtn("No Recoil", 85, "NoRecoil")
+
+-- /// HÀM QUÉT NPC (TỐI ƯU HÓA ĐỂ KHÔNG ĐƠ MÁY) ///
+local ValidHeads = {}
 task.spawn(function()
-    while task.wait(1) do
-        local temp = {}
-        -- Chỉ quét các Model trong workspace để tránh lag
+    while task.wait(0.5) do -- Chỉ quét 2 lần/giây để giảm tải CPU
+        local heads = {}
         for _, v in ipairs(workspace:GetChildren()) do
             if v:IsA("Model") and (v.Name == "Male" or v.Name == "Zombie" or v.Name == "Zombies") then
                 local head = v:FindFirstChild("Head")
-                local hum = v:FindFirstChildOfClass("Humanoid")
-                if head and hum and hum.Health > 0 then
-                    table.insert(temp, head)
-                end
-            end
-        end
-        ValidNPCs = temp
-    end
-end)
-
--- /// SILENT AIM BẰNG CÁCH THAY THẾ MOUSE.HIT (KHÔNG LAG) ///
-local mt = getrawmetatable(game)
-local oldIndex = mt.__index
-setreadonly(mt, false)
-
-mt.__index = newcclosure(function(self, idx)
-    -- Kiểm tra nếu game đang hỏi vị trí chuột (để bắn)
-    if self == Mouse and (idx == "Hit" or idx == "Target") and Settings.Enabled then
-        local nearestNPC = nil
-        local minDistance = Settings.HitboxSize * 8 -- Tầm hút đạn (pixel)
-
-        for _, head in ipairs(ValidNPCs) do
-            if head and head.Parent then
-                local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
-                if onScreen then
-                    local mousePos = Vector2.new(Mouse.X, Mouse.Y)
-                    local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+                if head and v:FindFirstChildOfClass("Humanoid") and v:FindFirstChildOfClass("Humanoid").Health > 0 then
+                    table.insert(heads, head)
                     
-                    if dist < minDistance then
-                        nearestNPC = head
-                        minDistance = dist
+                    -- Hiện khung đỏ tàng hình (Client-side duy nhất)
+                    local esp = head:FindFirstChild("ZomBox")
+                    if not esp and Settings.ShowVisual then
+                        esp = Instance.new("SelectionBox")
+                        esp.Name = "ZomBox"
+                        esp.Adornee = head
+                        esp.Color3 = Color3.new(1, 0, 0)
+                        esp.Transparency = 0.6
+                        esp.Parent = head
                     end
                 end
             end
         end
-
-        if nearestNPC then
-            -- Trả về vị trí của NPC thay vì vị trí chuột thật
-            return (idx == "Hit" and nearestNPC.CFrame or nearestNPC)
-        end
+        ValidHeads = heads
     end
-    return oldIndex(self, idx)
 end)
 
+-- /// SILENT AIM HOOK (ANTI-CHEAT SAFE) ///
+local mt = getrawmetatable(game)
+local old = mt.__index
+setreadonly(mt, false)
+
+mt.__index = newcclosure(function(self, idx)
+    if self == Mouse and (idx == "Hit" or idx == "Target") and Settings.Enabled then
+        local nearest = nil
+        local dist = Settings.HitboxSize * 8
+
+        for _, head in ipairs(ValidHeads) do
+            if head and head.Parent then
+                local p, on = Camera:WorldToViewportPoint(head.Position)
+                if on then
+                    local m = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(p.X, p.Y)).Magnitude
+                    if m < dist then
+                        nearest = head
+                        dist = m
+                    end
+                end
+            end
+        end
+        if nearest then return (idx == "Hit" and nearest.CFrame or nearest) end
+    end
+    return old(self, idx)
+end)
 setreadonly(mt, true)
 
--- /// NO RECOIL AN TOÀN ///
-game:GetService("RunService").RenderStepped:Connect(function()
+-- /// NO RECOIL ///
+RunService.RenderStepped:Connect(function()
     if Settings.NoRecoil and Camera:FindFirstChild("Spring") then
-        Camera.Spring.Value = Vector3.new(0, 0, 0)
+        Camera.Spring.Value = Vector3.new(0,0,0)
     end
 end)
-
-print("ZOM-HUB V10: Smooth & Safe Loaded")

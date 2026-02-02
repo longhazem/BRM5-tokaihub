@@ -1,8 +1,7 @@
--- /// ZOM-HUB V9 (ENGINE-LEVEL HITBOX - ANTI-DETECTION) ///
+-- /// ZOM-HUB V10 (SUPER SMOOTH & ANTI-CHEAT BYPASS) ///
 local Settings = {
-    HitboxSize = 15, -- Kích thước ảo (không đổi size thật)
-    Chance = 100, -- Tỉ lệ trúng (để 100 là luôn trúng)
-    WallCheck = true,
+    HitboxSize = 12, -- Kích thước ảo (Cực kỳ an toàn)
+    Enabled = true,
     NoRecoil = true
 }
 
@@ -11,71 +10,66 @@ local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 local Camera = workspace.CurrentCamera
 
--- HÀM TÌM NPC GẦN TÂM CHUỘT NHẤT (QUÉT QUA VECTOR)
-local function GetClosestNPC()
-    local target = nil
-    local minDist = Settings.HitboxSize * 10 -- Quy đổi đơn vị sang pixel màn hình
+-- Tối ưu hóa: Chỉ quét NPC 1 lần mỗi giây thay vì mỗi khung hình
+local ValidNPCs = {}
+task.spawn(function()
+    while task.wait(1) do
+        local temp = {}
+        -- Chỉ quét các Model trong workspace để tránh lag
+        for _, v in ipairs(workspace:GetChildren()) do
+            if v:IsA("Model") and (v.Name == "Male" or v.Name == "Zombie" or v.Name == "Zombies") then
+                local head = v:FindFirstChild("Head")
+                local hum = v:FindFirstChildOfClass("Humanoid")
+                if head and hum and hum.Health > 0 then
+                    table.insert(temp, head)
+                end
+            end
+        end
+        ValidNPCs = temp
+    end
+end)
 
-    for _, v in ipairs(workspace:GetDescendants()) do
-        if v:IsA("Model") and (v.Name == "Male" or v.Name == "Zombie" or v.Name == "Zombies") then
-            local head = v:FindFirstChild("Head")
-            if head and v:FindFirstChildOfClass("Humanoid") and v:FindFirstChildOfClass("Humanoid").Health > 0 then
-                local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+-- /// SILENT AIM BẰNG CÁCH THAY THẾ MOUSE.HIT (KHÔNG LAG) ///
+local mt = getrawmetatable(game)
+local oldIndex = mt.__index
+setreadonly(mt, false)
+
+mt.__index = newcclosure(function(self, idx)
+    -- Kiểm tra nếu game đang hỏi vị trí chuột (để bắn)
+    if self == Mouse and (idx == "Hit" or idx == "Target") and Settings.Enabled then
+        local nearestNPC = nil
+        local minDistance = Settings.HitboxSize * 8 -- Tầm hút đạn (pixel)
+
+        for _, head in ipairs(ValidNPCs) do
+            if head and head.Parent then
+                local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
                 if onScreen then
                     local mousePos = Vector2.new(Mouse.X, Mouse.Y)
-                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-                    if dist < minDist then
-                        target = head
-                        minDist = dist
+                    local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+                    
+                    if dist < minDistance then
+                        nearestNPC = head
+                        minDistance = dist
                     end
                 end
             end
         end
-    end
-    return target
-end
 
--- /// KỸ THUẬT HOOK RAYCAST (BẺ TIA TỪ GỐC) ///
--- Đây là cách các bản hack trả phí vượt Anticheat mà không bị ban
-local oldNamecall
-oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-    local method = getnamecallmethod()
-    local args = {...}
-
-    -- Nếu game gọi hàm Raycast hoặc FindPartOnRay để kiểm tra đạn trúng
-    if (method == "Raycast" or method == "FindPartOnRayWithIgnoreList") and not checkcaller() then
-        local targetHead = GetClosestNPC()
-        
-        if targetHead then
-            -- Nếu có NPC trong tầm Hitbox ảo, ta "đánh lừa" kết quả trả về
-            -- Thay vì trả về không gian trống, ta ép game nhận diện là trúng Head
-            if Settings.WallCheck then
-                -- Kiểm tra tường trước khi bẻ tia
-                local rayParams = RaycastParams.new()
-                rayParams.FilterType = Enum.RaycastFilterType.Exclude
-                rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
-                local check = workspace:Raycast(Camera.CFrame.Position, (targetHead.Position - Camera.CFrame.Position).Unit * 1000, rayParams)
-                
-                if check and check.Instance:IsDescendantOf(targetHead.Parent) then
-                    -- Bẻ hướng tia đạn thẳng vào đầu NPC
-                    if args[1] and typeof(args[1]) == "Vector3" and args[2] and typeof(args[2]) == "Vector3" then
-                        args[2] = (targetHead.Position - args[1]).Unit * 1000
-                    end
-                end
-            end
+        if nearestNPC then
+            -- Trả về vị trí của NPC thay vì vị trí chuột thật
+            return (idx == "Hit" and nearestNPC.CFrame or nearestNPC)
         end
     end
-    return oldNamecall(self, unpack(args))
+    return oldIndex(self, idx)
 end)
 
--- /// NO RECOIL (DẠNG KÍN) ///
+setreadonly(mt, true)
+
+-- /// NO RECOIL AN TOÀN ///
 game:GetService("RunService").RenderStepped:Connect(function()
-    if Settings.NoRecoil then
-        -- Chỉ xóa Spring để súng không nảy lên màn hình
-        if Camera:FindFirstChild("Spring") then
-            Camera.Spring.Value = Vector3.new(0,0,0)
-        end
+    if Settings.NoRecoil and Camera:FindFirstChild("Spring") then
+        Camera.Spring.Value = Vector3.new(0, 0, 0)
     end
 end)
 
-print("ZOM-HUB V9: Anti-Cheat Bypass Loaded")
+print("ZOM-HUB V10: Smooth & Safe Loaded")

@@ -1,116 +1,143 @@
 -- /// CONFIG & SERVICES ///
-local Settings = { Hitbox = 15, WallCheck = true, Enabled = true }
+local Settings = { 
+    Hitbox = 15, 
+    WallCheck = true, 
+    Enabled = true, 
+    EspEnabled = true 
+}
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 local Camera = workspace.CurrentCamera
 
--- /// TẠO UI (SELF-MADE) ///
+local EspObjects = {} -- Lưu trữ ESP
+
+-- /// HÀM XỬ LÝ ESP TỪNG NPC ///
+local function ApplyEsp(model)
+    if not model:FindFirstChild("Head") then return end
+    local head = model.Head
+    
+    -- Nếu đã có ESP rồi thì chỉ cập nhật hiển thị
+    local existingEsp = head:FindFirstChild("ZomEsp")
+    if existingEsp then
+        existingEsp.Visible = Settings.EspEnabled
+        return 
+    end
+
+    -- Tạo mới nếu chưa có
+    local box = Instance.new("BoxHandleAdornment")
+    box.Name = "ZomEsp"
+    box.Adornee = head
+    box.AlwaysOnTop = true
+    box.ZIndex = 5
+    box.Size = Vector3.new(1.3, 1.3, 1.3) -- Kích thước cố định (Fix lỗi phóng to)
+    
+    -- Phân màu
+    if model.Name == "Male" then
+        box.Color3 = Color3.fromRGB(0, 255, 0) -- Xanh lá
+    else
+        box.Color3 = Color3.fromRGB(255, 0, 0) -- Đỏ (Zombie, Zombies)
+    end
+
+    box.Transparency = 0.5
+    box.Visible = Settings.EspEnabled
+    box.Parent = head
+    table.insert(EspObjects, head)
+end
+
+-- /// UI LIBRARY (ZOM-HUB V3.2) ///
 local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-ScreenGui.Name = "ZomHub_Mini"
+ScreenGui.Name = "ZomHub_V3_Final"
 ScreenGui.ResetOnSpawn = false
 
--- Menu Chính
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 180, 0, 200)
+MainFrame.Size = UDim2.new(0, 180, 0, 240)
 MainFrame.Position = UDim2.new(0.5, -90, 0.4, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-MainFrame.BorderSizePixel = 0
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.Draggable = true
 MainFrame.Active = true
-MainFrame.Draggable = true -- Có thể kéo
+Instance.new("UICorner", MainFrame)
 
-local UICorner = Instance.new("UICorner", MainFrame)
-UICorner.CornerRadius = UDim.new(0, 8)
-
--- Title
 local Title = Instance.new("TextLabel", MainFrame)
-Title.Size = UDim2.new(1, 0, 0, 30)
-Title.Text = "ZOM-HUB v1"
+Title.Size = UDim2.new(1, 0, 0, 35)
+Title.Text = "ZOM-HUB V3.2"
 Title.TextColor3 = Color3.new(1, 1, 1)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
 
--- Nút Thu Nhỏ (X)
 local CloseBtn = Instance.new("TextButton", MainFrame)
 CloseBtn.Size = UDim2.new(0, 25, 0, 25)
 CloseBtn.Position = UDim2.new(1, -30, 0, 5)
-CloseBtn.Text = "-"
-CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseBtn.Text = "X"
+CloseBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
 CloseBtn.TextColor3 = Color3.new(1, 1, 1)
 Instance.new("UICorner", CloseBtn)
 
--- Nút Mở Nhanh (Nút nổi khi thu nhỏ)
 local OpenBtn = Instance.new("TextButton", ScreenGui)
-OpenBtn.Size = UDim2.new(0, 40, 0, 40)
+OpenBtn.Size = UDim2.new(0, 45, 0, 45)
 OpenBtn.Position = UDim2.new(0, 10, 0.5, 0)
 OpenBtn.Text = "🎯"
 OpenBtn.Visible = false
-OpenBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-OpenBtn.Draggable = true
+OpenBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
 Instance.new("UICorner", OpenBtn).CornerRadius = UDim.new(1, 0)
 
--- Hàm tạo Nút Bật/Tắt trong Menu
 local function CreateToggle(name, pos, default, callback)
     local btn = Instance.new("TextButton", MainFrame)
-    btn.Size = UDim2.new(0.8, 0, 0, 35)
-    btn.Position = UDim2.new(0.1, 0, 0, pos)
+    btn.Size = UDim2.new(0.85, 0, 0, 35)
+    btn.Position = UDim2.new(0.075, 0, 0, pos)
     btn.Font = Enum.Font.Gotham
-    btn.TextSize = 14
-    
     local function update()
         btn.Text = name .. ": " .. (default and "ON" or "OFF")
-        btn.BackgroundColor3 = default and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(60, 60, 60)
+        btn.BackgroundColor3 = default and Color3.fromRGB(0, 120, 255) or Color3.fromRGB(50, 50, 50)
         btn.TextColor3 = Color3.new(1,1,1)
     end
-    
-    btn.MouseButton1Click:Connect(function()
-        default = not default
-        update()
-        callback(default)
-    end)
+    btn.MouseButton1Click:Connect(function() default = not default; update(); callback(default) end)
     update()
     Instance.new("UICorner", btn)
 end
 
--- /// SỰ KIỆN NÚT ///
 CreateToggle("Silent Aim", 45, Settings.Enabled, function(v) Settings.Enabled = v end)
-CreateToggle("Wall Check", 90, Settings.WallCheck, function(v) Settings.WallCheck = v end)
-CreateToggle("Hitbox 15/20", 135, true, function(v) Settings.Hitbox = v and 15 or 5 end)
+CreateToggle("Full ESP", 90, Settings.EspEnabled, function(v) Settings.EspEnabled = v end)
+CreateToggle("Wall Check", 135, Settings.WallCheck, function(v) Settings.WallCheck = v end)
+CreateToggle("Hitbox 15", 180, true, function(v) Settings.Hitbox = v and 15 or 2 end)
 
-CloseBtn.MouseButton1Click:Connect(function()
-    MainFrame.Visible = false
-    OpenBtn.Visible = true
+CloseBtn.MouseButton1Click:Connect(function() MainFrame.Visible = false; OpenBtn.Visible = true end)
+OpenBtn.MouseButton1Click:Connect(function() MainFrame.Visible = true; OpenBtn.Visible = false end)
+
+-- /// VÒNG LẶP QUÉT TOÀN BỘ WORKSPACE (FIX LỖI THIẾU NPC) ///
+RunService.Heartbeat:Connect(function()
+    for _, v in ipairs(workspace:GetChildren()) do
+        if (v.Name == "Male" or v.Name == "Zombie" or v.Name == "Zombies") then
+            local hum = v:FindFirstChildOfClass("Humanoid")
+            if hum and hum.Health > 0 then
+                ApplyEsp(v)
+            end
+        end
+    end
 end)
 
-OpenBtn.MouseButton1Click:Connect(function()
-    MainFrame.Visible = true
-    OpenBtn.Visible = false
-end)
-
--- /// LOGIC BẮN (BẢN ANTI-BAN) ///
+-- /// LOGIC SILENT AIM ///
 local function IsVisible(part)
     if not Settings.WallCheck then return true end
-    local rayParam = RaycastParams.new()
-    rayParam.FilterType = Enum.RaycastFilterType.Exclude
-    rayParam.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
-    local result = workspace:Raycast(Camera.CFrame.Position, (part.Position - Camera.CFrame.Position).Unit * 500, rayParam)
-    return result and result.Instance:IsDescendantOf(part.Parent)
+    local ray = RaycastParams.new()
+    ray.FilterType = Enum.RaycastFilterType.Exclude
+    ray.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
+    local res = workspace:Raycast(Camera.CFrame.Position, (part.Position - Camera.CFrame.Position).Unit * 1000, ray)
+    return res and res.Instance:IsDescendantOf(part.Parent)
 end
 
 local function GetTarget()
     if not Settings.Enabled then return nil end
-    local Best, Closest = nil, Settings.Hitbox * 18
-    for _, v in pairs(workspace:GetChildren()) do
-        if (v.Name:find("Zombie") or v.Name:find("Male")) and v:FindFirstChild("Head") and v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 then
-            local Head = v.Head
-            local Pos, OnScreen = Camera:WorldToViewportPoint(Head.Position)
+    local Best, Closest = nil, Settings.Hitbox * 20
+    for _, head in ipairs(EspObjects) do
+        if head and head.Parent and head.Parent:FindFirstChild("Humanoid") and head.Parent.Humanoid.Health > 0 then
+            local Pos, OnScreen = Camera:WorldToViewportPoint(head.Position)
             if OnScreen then
                 local Dist = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(Pos.X, Pos.Y)).Magnitude
-                if Dist < Closest and IsVisible(Head) then
+                if Dist < Closest and IsVisible(head) then
                     Closest = Dist
-                    Best = Head
+                    Best = head
                 end
             end
         end
@@ -118,7 +145,6 @@ local function GetTarget()
     return Best
 end
 
--- Hook hệ thống
 local mt = getrawmetatable(game)
 local old = mt.__index
 setreadonly(mt, false)
@@ -130,5 +156,3 @@ mt.__index = newcclosure(function(self, idx)
     return old(self, idx)
 end)
 setreadonly(mt, true)
-
-print("UI Loaded: Sử dụng nút tròn bên trái để mở Menu!")

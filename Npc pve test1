@@ -15,18 +15,21 @@ local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 local Camera = workspace.CurrentCamera
 
--- /// UI TỐI GIẢN - KHÔNG CHẶN DI CHUYỂN ///
+-- /// BIẾN TẠM ĐỂ TRÁNH LAG ///
+local LockedTarget = nil
+local Targets = {}
+
+-- /// UI TỐI GIẢN ///
 local ScreenGui = Instance.new("ScreenGui", LocalPlayer:FindFirstChildOfClass("PlayerGui"))
-ScreenGui.Name = "ZomUltra"
+ScreenGui.Name = "ZomUltra_Fixed"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.IgnoreGuiInset = true -- Tránh lệch tọa độ trên mobile
 
 local Main = Instance.new("Frame", ScreenGui)
-Main.Size = UDim2.new(0, 130, 0, 150)
-Main.Position = UDim2.new(0.05, 0, 0.1, 0) -- Đưa hẳn lên góc trên bên trái
+Main.Size = UDim2.new(0, 130, 0, 160)
+Main.Position = UDim2.new(0.05, 0, 0.1, 0)
 Main.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 Main.BackgroundTransparency = 0.3
-Main.Active = false -- QUAN TRỌNG: Không chặn touch di chuyển
+Main.Active = true
 Main.Draggable = true
 
 local function CreateBtn(text, pos, setting)
@@ -38,7 +41,6 @@ local function CreateBtn(text, pos, setting)
     btn.TextColor3 = Color3.new(1, 1, 1)
     btn.Font = Enum.Font.SourceSansBold
     btn.TextSize = 12
-    btn.Active = true -- Chỉ nút này mới nhận touch
     
     btn.MouseButton1Click:Connect(function()
         Settings[setting] = not Settings[setting]
@@ -47,12 +49,12 @@ local function CreateBtn(text, pos, setting)
     end)
 end
 
-CreateBtn("Silent Aim", 35, "Silent")
-CreateBtn("No Recoil", 65, "NoRecoil")
-CreateBtn("Wall Check", 95, "WallCheck")
-CreateBtn("ESP NPC", 125, "Esp")
+CreateBtn("Silent Aim", 10, "Silent")
+CreateBtn("No Recoil", 40, "NoRecoil")
+CreateBtn("Wall Check", 70, "WallCheck")
+CreateBtn("ESP NPC", 100, "Esp")
 
--- /// KIỂM TRA TƯỜNG ///
+-- /// HÀM KIỂM TRA TƯỜNG (TỐI ƯU) ///
 local function IsVisible(part)
     if not Settings.WallCheck then return true end
     local char = LocalPlayer.Character
@@ -66,100 +68,80 @@ local function IsVisible(part)
     return not result or result.Instance:IsDescendantOf(part.Parent)
 end
 
--- /// QUÉT NPC THÔNG MINH - KHÔNG GÂY ĐƠ ///
-local Targets = {}
-local lastUpdate = 0
-
-RunService.Heartbeat:Connect(function()
-    if tick() - lastUpdate < 1.5 then return end -- Chỉ quét sau mỗi 1.5 giây để tránh đơ máy
-    lastUpdate = tick()
-    
-    local newTargets = {}
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    
-    -- Chỉ quét các Model trực tiếp trong Workspace để cực nhẹ
-    for _, obj in ipairs(workspace:GetChildren()) do
-        if obj:IsA("Model") and (obj.Name == "Male" or obj.Name == "Zombie" or obj.Name == "Zombies") then
-            -- Chắc chắn KHÔNG PHẢI người chơi
-            if not Players:GetPlayerFromCharacter(obj) then
+-- /// QUÉT NPC VÀ TÌM MỤC TIÊU (CHẠY RIÊNG BIỆT) ///
+task.spawn(function()
+    while task.wait(0.1) do -- Chạy 10 lần/giây, không gây đơ
+        local newTargets = {}
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        
+        for _, obj in ipairs(workspace:GetChildren()) do
+            if obj:IsA("Model") and (obj.Name == "Male" or obj.Name == "Zombie" or obj.Name == "Zombies") then
                 local head = obj:FindFirstChild("Head")
                 local hum = obj:FindFirstChildOfClass("Humanoid")
                 
                 if head and hum and hum.Health > 0 then
-                    local dist = root and (head.Position - root.Position).Magnitude or 0
-                    if dist < Settings.Distance then
-                        table.insert(newTargets, head)
-                        
-                        -- ESP
-                        if Settings.Esp then
-                            local hl = obj:FindFirstChild("ZomH") or Instance.new("Highlight", obj)
+                    table.insert(newTargets, head)
+                    
+                    -- Quản lý ESP thông minh
+                    local hl = obj:FindFirstChild("ZomH")
+                    if Settings.Esp then
+                        if not hl then
+                            hl = Instance.new("Highlight", obj)
                             hl.Name = "ZomH"
-                            hl.FillColor = (obj.Name == "Male") and Settings.MaleColor or Settings.ZombieColor
-                            hl.FillTransparency = 0.5
-                            hl.Enabled = true
-                        elseif obj:FindFirstChild("ZomH") then
-                            obj.ZomH.Enabled = false
                         end
+                        hl.FillColor = (obj.Name == "Male") and Settings.MaleColor or Settings.ZombieColor
+                        hl.Enabled = true
+                    elseif hl then
+                        hl.Enabled = false
                     end
                 end
             end
         end
-    end
-    Targets = newTargets
-end)
-
--- /// SILENT AIM ///
-local function GetTarget()
-    local best = nil
-    local minDist = Settings.Radius
-    
-    for _, head in ipairs(Targets) do
-        if head and head.Parent then
-            local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
-            if onScreen and IsVisible(head) then
-                local d = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(pos.X, pos.Y)).Magnitude
-                if d < minDist then
-                    best = head
-                    minDist = d
+        Targets = newTargets
+        
+        -- Tìm mục tiêu gần chuột nhất và lưu vào biến LockedTarget
+        local best = nil
+        local minDist = Settings.Radius
+        
+        if Settings.Silent then
+            for _, head in ipairs(Targets) do
+                local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                if onScreen and IsVisible(head) then
+                    local d = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(pos.X, pos.Y)).Magnitude
+                    if d < minDist then
+                        best = head
+                        minDist = d
+                    end
                 end
             end
         end
+        LockedTarget = best
     end
-    return best
-end
+end)
 
+-- /// SILENT AIM HOOK (SIÊU NHẸ) ///
 local mt = getrawmetatable(game)
 local oldIdx = mt.__index
-local oldNc = mt.__namecall
 setreadonly(mt, false)
 
 mt.__index = newcclosure(function(self, idx)
+    -- Chỉ lấy giá trị đã tính sẵn, không tính toán lại trong này
     if not checkcaller() and Settings.Silent and self == Mouse and (idx == "Hit" or idx == "Target") then
-        local t = GetTarget()
-        if t then return (idx == "Hit" and t.CFrame or t) end
+        if LockedTarget then
+            return (idx == "Hit" and LockedTarget.CFrame or LockedTarget)
+        end
     end
     return oldIdx(self, idx)
 end)
-
-mt.__namecall = newcclosure(function(self, ...)
-    local method = getnamecallmethod()
-    local args = {...}
-    if not checkcaller() and Settings.Silent and method == "Raycast" and self == workspace then
-        local t = GetTarget()
-        if t then
-            args[2] = (t.Position - args[1]).Unit * args[2].Magnitude
-            return oldNc(self, unpack(args))
-        end
-    end
-    return oldNc(self, ...)
-end)
 setreadonly(mt, true)
 
--- NO RECOIL
+-- /// NO RECOIL ///
 RunService.RenderStepped:Connect(function()
     if Settings.NoRecoil then
         local recoil = Camera:FindFirstChild("Recoil") or Camera:FindFirstChild("Spring")
-        if recoil and recoil:IsA("Vector3Value") then recoil.Value = Vector3.new(0,0,0) end
+        if recoil and (recoil:IsA("Vector3Value") or recoil:IsA("NumberValue")) then 
+            recoil.Value = recoil:IsA("Vector3Value") and Vector3.new(0,0,0) or 0 
+        end
     end
 end)

@@ -1,147 +1,74 @@
--- Chờ game tải
-if not game:IsLoaded() then game.Loaded:Wait() end
-
 local Settings = {
-    SilentAim = true,
-    FovRadius = 200, -- Phạm vi ăn mục tiêu (Thay thế cho Hitbox 15)
-    ShowFov = true,
+    HitboxSize = 15,
+    Enabled = true,
     Esp = true,
-    TeamCheck = false -- Đổi thành true nếu game chia phe
 }
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
-local RunService = game:GetService("RunService")
 
--- /// UI TỐI GIẢN (Cố định ở góc màn hình) ///
+-- /// UI CŨ CỦA BẠN ///
 local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-local Frame = Instance.new("Frame", ScreenGui)
-Frame.Size = UDim2.new(0, 150, 0, 100)
-Frame.Position = UDim2.new(0, 20, 0.4, 0)
-Frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-Frame.BackgroundTransparency = 0.5
+local Main = Instance.new("Frame", ScreenGui)
+Main.Size = UDim2.new(0, 150, 0, 110)
+Main.Position = UDim2.new(0.1, 0, 0.4, 0)
+Main.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Main.Draggable = true
 
-local Label = Instance.new("TextLabel", Frame)
-Label.Size = UDim2.new(1, 0, 1, 0)
-Label.Text = "SILENT AIM: ON\nESP: ON\n[F9 để xem Log]"
-Label.TextColor3 = Color3.new(1, 1, 1)
-Label.TextSize = 14
-
--- /// FOV CIRCLE (Bẻ đạn trong vùng này) ///
-local Circle = Drawing.new("Circle")
-Circle.Thickness = 1
-Circle.Color = Color3.new(1, 0, 0)
-Circle.Transparency = 0.7
-Circle.NumSides = 64
-
--- /// HÀM TÌM NPC CHÍNH XÁC NHẤT ///
-local function GetClosestNPC()
-    local target = nil
-    local maxDist = Settings.FovRadius
+local function CreateBtn(text, pos, setting)
+    local btn = Instance.new("TextButton", Main)
+    btn.Size = UDim2.new(0.9, 0, 0, 40)
+    btn.Position = UDim2.new(0.05, 0, 0, pos)
+    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    btn.Text = text .. ": ON"
+    btn.TextColor3 = Color3.new(1, 1, 1)
     
-    -- Quét toàn bộ model có Humanoid
-    for _, v in ipairs(workspace:GetDescendants()) do
-        if v:IsA("Humanoid") and v.Parent:IsA("Model") and v.Parent ~= LocalPlayer.Character then
-            local model = v.Parent
-            local head = model:FindFirstChild("Head") or model:FindFirstChildOfClass("MeshPart")
-            
-            if head and v.Health > 0 then
-                local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
-                if onScreen then
-                    local mouseDist = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
-                    if mouseDist < maxDist then
-                        target = head
-                        maxDist = mouseDist
+    btn.MouseButton1Click:Connect(function()
+        Settings[setting] = not Settings[setting]
+        btn.Text = text .. (Settings[setting] and ": ON" or ": OFF")
+        btn.BackgroundColor3 = Settings[setting] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(150, 0, 0)
+    end)
+end
+
+CreateBtn("Hitbox 15", 10, "Enabled")
+CreateBtn("ESP Body", 60, "Esp")
+
+-- /// XỬ LÝ HITBOX & ESP ///
+task.spawn(function()
+    while task.wait(0.1) do
+        for _, v in ipairs(workspace:GetDescendants()) do
+            if v:IsA("Model") and v:FindFirstChild("Head") and v:FindFirstChildOfClass("Humanoid") and v ~= LocalPlayer.Character then
+                local head = v.Head
+                local root = v:FindFirstChild("HumanoidRootPart")
+                
+                -- Hitbox Hình Đầu (Ball) - Cố gắng lách Anti-cheat
+                if Settings.Enabled then
+                    head.Shape = Enum.PartType.Ball
+                    head.Size = Vector3.new(Settings.HitboxSize, Settings.HitboxSize, Settings.HitboxSize)
+                    head.Transparency = 0.8
+                    head.CanCollide = false -- Quan trọng: Không để nhân vật bị kẹt vào hitbox
+                else
+                    head.Shape = Enum.PartType.Block
+                    head.Size = Vector3.new(1.2, 1.2, 1.2)
+                    head.Transparency = 0
+                end
+
+                -- ESP Fix: Gắn vào RootPart để không bị to theo đầu
+                if root then
+                    local box = root:FindFirstChild("SelectionBox")
+                    if Settings.Esp then
+                        if not box then
+                            box = Instance.new("SelectionBox", root)
+                            box.Adornee = root -- Chỉ bao quanh cái thân
+                            box.Color3 = Color3.new(1, 0, 0)
+                            box.LineThickness = 0.05
+                        end
+                    elseif box then
+                        box:Destroy()
                     end
                 end
             end
         end
     end
-    return target
-end
-
--- /// ESP DÙNG DRAWING (KHÔNG BỊ PHÓNG TO, KHÔNG LỖI) ///
-local Boxes = {}
-local function CreateEsp(model)
-    if Boxes[model] then return end
-    local box = Drawing.new("Square")
-    box.Thickness = 1
-    box.Filled = false
-    box.Color = Color3.new(0, 1, 0)
-    box.Transparency = 1
-    Boxes[model] = box
-end
-
-RunService.RenderStepped:Connect(function()
-    -- Cập nhật vòng FOV
-    Circle.Visible = Settings.ShowFov
-    Circle.Radius = Settings.FovRadius
-    Circle.Position = Vector2.new(Mouse.X, Mouse.Y + 36)
-
-    -- Cập nhật ESP
-    for model, box in pairs(Boxes) do
-        local hum = model:FindFirstChildOfClass("Humanoid")
-        local root = model:FindFirstChild("HumanoidRootPart")
-        
-        if Settings.Esp and hum and hum.Health > 0 and root then
-            local pos, vis = Camera:WorldToViewportPoint(root.Position)
-            if vis then
-                local size = (Camera:WorldToViewportPoint(root.Position + Vector3.new(2, 3, 0)).Y - Camera:WorldToViewportPoint(root.Position - Vector3.new(2, 3, 0)).Y)
-                box.Size = Vector2.new(size * 0.6, size)
-                box.Position = Vector2.new(pos.X - box.Size.X / 2, pos.Y - box.Size.Y / 2)
-                box.Visible = true
-            else
-                box.Visible = false
-            end
-        else
-            box.Visible = false
-        end
-    end
 end)
-
--- Quét NPC mới để tạo ESP
-task.spawn(function()
-    while task.wait(1) do
-        for _, v in ipairs(workspace:GetDescendants()) do
-            if v:IsA("Humanoid") and v.Parent:IsA("Model") and v.Parent ~= LocalPlayer.Character then
-                CreateEsp(v.Parent)
-            end
-        end
-    end
-end)
-
--- /// SILENT AIM (Bypass Anti-cheat 100%) ///
--- Thay vì sửa Hitbox, chúng ta sửa gói tin "Hit" gửi về Server
-local mt = getrawmetatable(game)
-local oldNamecall = mt.__namecall
-setreadonly(mt, false)
-
-mt.__namecall = newcclosure(function(self, ...)
-    local method = getnamecallmethod()
-    local args = {...}
-    
-    -- Nếu game dùng Raycast hoặc gói tin FireServer để bắn
-    if Settings.SilentAim and (method == "FindPartOnRay" or method == "Raycast" or method == "FireServer") then
-        local target = GetClosestNPC()
-        if target then
-            -- Chỉnh hướng đạn vào đầu NPC mà không cần sửa Hitbox
-            return oldNamecall(self, unpack(args)) -- (Chỗ này tùy game sẽ cần chỉnh args, nhưng để an toàn hãy dùng Mouse Hook)
-        end
-    end
-    return oldNamecall(self, ...)
-end)
-
--- Hook Mouse Index (Cách ăn mục tiêu chắc chắn nhất)
-local oldIdx = mt.__index
-mt.__index = newcclosure(function(self, idx)
-    if self == Mouse and (idx == "Hit" or idx == "Target") and Settings.SilentAim then
-        local t = GetClosestNPC()
-        if t then return (idx == "Hit" and t.CFrame or t) end
-    end
-    return oldIdx(self, idx)
-end)
-setreadonly(mt, true)
-
-print("BYPASS ACTIVE - DÙNG FOV ĐỂ BẮN")

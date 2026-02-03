@@ -1,71 +1,122 @@
 local Settings = {
-    HitboxSize = 15, -- Bạn có thể chỉnh lên 15 như họ
-    HitboxTransparency = 0.8, -- 0.8 để bạn nhìn thấy khối ảo, 1 là tàng hình hoàn toàn
-    Distance = 1000,
-    Enabled = true
+    HitboxSize = 15,
+    HitboxExpander = true,
+    SilentAim = true,
+    Esp = true,
+    Radius = 150,
 }
 
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+local Camera = workspace.CurrentCamera
 local RunService = game:GetService("RunService")
-local task = task -- Dùng task để tối ưu hiệu năng
 
--- Hàm tạo Hitbox ảo cho từng NPC
-local function CreateFakeHitbox(model)
-    if not model:FindFirstChild("Head") or model:FindFirstChild("FakeHitbox") then return end
-    
-    local head = model.Head
-    local fakePart = Instance.new("Part")
-    
-    fakePart.Name = "FakeHitbox"
-    fakePart.Parent = model
-    fakePart.Size = Vector3.new(Settings.HitboxSize, Settings.HitboxSize, Settings.HitboxSize)
-    fakePart.Transparency = Settings.HitboxTransparency
-    fakePart.Color = Color3.fromRGB(255, 0, 0)
-    fakePart.CanCollide = false -- Không gây kẹt đường đi
-    fakePart.Anchored = false
-    fakePart.Massless = true
-    
-    -- Gắn chặt khối ảo vào đầu NPC
-    local weld = Instance.new("Weld", fakePart)
-    weld.Part0 = fakePart
-    weld.Part1 = head
-    weld.C0 = CFrame.new(0, 0, 0)
+-- /// UI MENU ///
+local ScreenGui = Instance.new("ScreenGui", LocalPlayer:FindFirstChildOfClass("PlayerGui"))
+local Main = Instance.new("Frame", ScreenGui)
+Main.Size = UDim2.new(0, 160, 0, 180)
+Main.Position = UDim2.new(0.05, 0, 0.2, 0)
+Main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Main.Active = true
+Main.Draggable = true
 
-    -- Đảm bảo khi NPC chết thì khối ảo biến mất
-    local hum = model:FindFirstChildOfClass("Humanoid")
-    if hum then
-        hum.Died:Connect(function()
-            fakePart:Destroy()
-        end)
+local function CreateToggle(text, pos, setting)
+    local btn = Instance.new("TextButton", Main)
+    btn.Size = UDim2.new(0.9, 0, 0, 30)
+    btn.Position = UDim2.new(0.05, 0, 0, pos)
+    btn.BackgroundColor3 = Settings[setting] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
+    btn.Text = text .. ": " .. (Settings[setting] and "ON" or "OFF")
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    
+    btn.MouseButton1Click:Connect(function()
+        Settings[setting] = not Settings[setting]
+        btn.Text = text .. ": " .. (Settings[setting] and "ON" or "OFF")
+        btn.BackgroundColor3 = Settings[setting] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
+    end)
+end
+
+CreateToggle("Hitbox 15", 10, "HitboxExpander")
+CreateToggle("Silent Aim", 50, "SilentAim")
+CreateToggle("ESP", 90, "Esp")
+
+-- /// LOGIC XỬ LÝ NPC ///
+local function UpdateNPC()
+    for _, obj in ipairs(workspace:GetChildren()) do
+        if obj:IsA("Model") and (obj.Name == "Male" or obj.Name == "Zombie") then
+            local head = obj:FindFirstChild("Head")
+            local hum = obj:FindFirstChildOfClass("Humanoid")
+            
+            if head and hum and hum.Health > 0 then
+                -- 1. Hitbox Expander (Sửa lỗi không chết)
+                if Settings.HitboxExpander then
+                    head.Size = Vector3.new(Settings.HitboxSize, Settings.HitboxSize, Settings.HitboxSize)
+                    head.Transparency = 0.7
+                    head.CanCollide = false -- Quan trọng: Để đạn xuyên qua vào trong
+                else
+                    head.Size = Vector3.new(1.2, 1.2, 1.2)
+                    head.Transparency = 0
+                end
+                
+                -- 2. ESP
+                local highlight = obj:FindFirstChild("ZomEsp")
+                if Settings.Esp then
+                    if not highlight then
+                        highlight = Instance.new("Highlight", obj)
+                        highlight.Name = "ZomEsp"
+                        highlight.FillColor = Color3.new(1, 0, 0)
+                    end
+                    highlight.Enabled = true
+                elseif highlight then
+                    highlight.Enabled = false
+                end
+            end
+        end
     end
 end
 
--- Vòng lặp quét NPC (Tối ưu không gây lag)
-task.spawn(function()
-    while true do
-        if Settings.Enabled then
-            for _, obj in ipairs(workspace:GetChildren()) do
-                -- Kiểm tra đúng tên NPC trong game của bạn (Male, Zombie, v.v.)
-                if obj:IsA("Model") and (obj.Name == "Male" or obj.Name == "Zombie" or obj.Name == "Zombies") then
-                    CreateFakeHitbox(obj)
+-- /// SILENT AIM (ĐẢM BẢO TRÚNG ĐÍCH) ///
+local function GetTarget()
+    local nearest = nil
+    local lastDist = Settings.Radius
+    
+    for _, obj in ipairs(workspace:GetChildren()) do
+        local head = obj:FindFirstChild("Head")
+        local hum = obj:FindFirstChildOfClass("Humanoid")
+        if head and hum and hum.Health > 0 then
+            local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+            if onScreen then
+                local dist = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(pos.X, pos.Y)).Magnitude
+                if dist < lastDist then
+                    nearest = head
+                    lastDist = dist
                 end
             end
         end
-        task.wait(2) -- Quét NPC mới mỗi 2 giây để cực nhẹ máy
     end
+    return nearest
+end
+
+-- Hook hệ thống để bẻ đạn
+local mt = getrawmetatable(game)
+local oldIdx = mt.__index
+setreadonly(mt, false)
+
+mt.__index = newcclosure(function(self, idx)
+    if self == Mouse and (idx == "Hit" or idx == "Target") and Settings.SilentAim then
+        local target = GetTarget()
+        if target then
+            return (idx == "Hit" and target.CFrame or target)
+        end
+    end
+    return oldIdx(self, idx)
 end)
 
--- Cập nhật kích thước Hitbox theo Settings (Nếu bạn muốn đổi lúc đang chơi)
+setreadonly(mt, true)
+
+-- Vòng lặp cập nhật
 task.spawn(function()
-    while task.wait(1) do
-        for _, obj in ipairs(workspace:GetChildren()) do
-            local fake = obj:FindFirstChild("FakeHitbox")
-            if fake then
-                if Settings.Enabled then
-                    fake.Size = Vector3.new(Settings.HitboxSize, Settings.HitboxSize, Settings.HitboxSize)
-                else
-                    fake.Size = Vector3.new(0.01, 0.01, 0.01) -- Thu nhỏ khi tắt
-                end
-            end
-        end
+    while task.wait(0.5) do
+        UpdateNPC()
     end
 end)

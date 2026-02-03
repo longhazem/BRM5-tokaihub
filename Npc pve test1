@@ -2,8 +2,9 @@ local Settings = {
     HitboxSize = 15,
     HitboxExpander = true,
     SilentAim = true,
+    TriggerBot = true,
     Esp = true,
-    Radius = 150,
+    FovRadius = 150,
 }
 
 local Players = game:GetService("Players")
@@ -15,15 +16,15 @@ local RunService = game:GetService("RunService")
 -- /// UI MENU ///
 local ScreenGui = Instance.new("ScreenGui", LocalPlayer:FindFirstChildOfClass("PlayerGui"))
 local Main = Instance.new("Frame", ScreenGui)
-Main.Size = UDim2.new(0, 160, 0, 180)
-Main.Position = UDim2.new(0.05, 0, 0.2, 0)
-Main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Main.Size = UDim2.new(0, 160, 0, 220)
+Main.Position = UDim2.new(0.05, 0, 0.3, 0)
+Main.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 Main.Active = true
 Main.Draggable = true
 
 local function CreateToggle(text, pos, setting)
     local btn = Instance.new("TextButton", Main)
-    btn.Size = UDim2.new(0.9, 0, 0, 30)
+    btn.Size = UDim2.new(0.9, 0, 0, 35)
     btn.Position = UDim2.new(0.05, 0, 0, pos)
     btn.BackgroundColor3 = Settings[setting] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
     btn.Text = text .. ": " .. (Settings[setting] and "ON" or "OFF")
@@ -36,87 +37,82 @@ local function CreateToggle(text, pos, setting)
     end)
 end
 
-CreateToggle("Hitbox 15", 10, "HitboxExpander")
+CreateToggle("Head Hitbox", 10, "HitboxExpander")
 CreateToggle("Silent Aim", 50, "SilentAim")
-CreateToggle("ESP", 90, "Esp")
+CreateToggle("ESP Body", 90, "Esp")
+CreateToggle("TriggerBot", 130, "TriggerBot")
 
--- /// LOGIC XỬ LÝ NPC ///
-local function UpdateNPC()
-    for _, obj in ipairs(workspace:GetChildren()) do
-        if obj:IsA("Model") and (obj.Name == "Male" or obj.Name == "Zombie") then
-            local head = obj:FindFirstChild("Head")
-            local hum = obj:FindFirstChildOfClass("Humanoid")
-            
-            if head and hum and hum.Health > 0 then
-                -- 1. Hitbox Expander (Sửa lỗi không chết)
-                if Settings.HitboxExpander then
-                    head.Size = Vector3.new(Settings.HitboxSize, Settings.HitboxSize, Settings.HitboxSize)
-                    head.Transparency = 0.7
-                    head.CanCollide = false -- Quan trọng: Để đạn xuyên qua vào trong
-                else
-                    head.Size = Vector3.new(1.2, 1.2, 1.2)
-                    head.Transparency = 0
-                end
-                
-                -- 2. ESP
-                local highlight = obj:FindFirstChild("ZomEsp")
-                if Settings.Esp then
-                    if not highlight then
-                        highlight = Instance.new("Highlight", obj)
-                        highlight.Name = "ZomEsp"
-                        highlight.FillColor = Color3.new(1, 0, 0)
-                    end
-                    highlight.Enabled = true
-                elseif highlight then
-                    highlight.Enabled = false
-                end
-            end
-        end
-    end
-end
-
--- /// SILENT AIM (ĐẢM BẢO TRÚNG ĐÍCH) ///
-local function GetTarget()
-    local nearest = nil
-    local lastDist = Settings.Radius
-    
-    for _, obj in ipairs(workspace:GetChildren()) do
-        local head = obj:FindFirstChild("Head")
-        local hum = obj:FindFirstChildOfClass("Humanoid")
-        if head and hum and hum.Health > 0 then
-            local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
-            if onScreen then
-                local dist = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(pos.X, pos.Y)).Magnitude
-                if dist < lastDist then
-                    nearest = head
-                    lastDist = dist
-                end
-            end
-        end
-    end
-    return nearest
-end
-
--- Hook hệ thống để bẻ đạn
-local mt = getrawmetatable(game)
-local oldIdx = mt.__index
-setreadonly(mt, false)
-
-mt.__index = newcclosure(function(self, idx)
-    if self == Mouse and (idx == "Hit" or idx == "Target") and Settings.SilentAim then
-        local target = GetTarget()
-        if target then
-            return (idx == "Hit" and target.CFrame or target)
-        end
-    end
-    return oldIdx(self, idx)
-end)
-
-setreadonly(mt, true)
-
--- Vòng lặp cập nhật
+-- /// LOGIC HITBOX HÌNH CẦU & ESP ///
 task.spawn(function()
     while task.wait(0.5) do
-        UpdateNPC()
+        for _, obj in ipairs(workspace:GetChildren()) do
+            if obj:IsA("Model") and (obj.Name == "Male" or obj.Name == "Zombie" or obj.Name == "Zombies") then
+                local head = obj:FindFirstChild("Head")
+                local root = obj:FindFirstChild("HumanoidRootPart")
+                
+                if head then
+                    -- Biến Head thành hình tròn khổng lồ
+                    if Settings.HitboxExpander then
+                        head.Shape = Enum.PartType.Ball -- CHỈNH THÀNH HÌNH CẦU
+                        head.Size = Vector3.new(Settings.HitboxSize, Settings.HitboxSize, Settings.HitboxSize)
+                        head.Transparency = 0.8
+                        head.CanCollide = false
+                    else
+                        head.Shape = Enum.PartType.Block -- Trả về hình hộp mặc định
+                        head.Size = Vector3.new(1.2, 1.2, 1.2)
+                        head.Transparency = 0
+                    end
+                end
+
+                -- ESP cố định vào thân (không bị to theo đầu)
+                if root and Settings.Esp then
+                    local box = root:FindFirstChild("ZomBox")
+                    if not box then
+                        box = Instance.new("SelectionBox", root)
+                        box.Name = "ZomBox"
+                        box.Adornee = root
+                        box.Color3 = Color3.new(1, 0, 0)
+                        box.LineThickness = 0.05
+                    end
+                elseif root and root:FindFirstChild("ZomBox") then
+                    root.ZomBox:Destroy()
+                end
+            end
+        end
+    end
+end)
+
+-- /// SILENT AIM HOOK ///
+local function GetClosest()
+    local target = nil
+    local dist = Settings.FovRadius
+    for _, v in ipairs(workspace:GetChildren()) do
+        if v:IsA("Model") and v:FindFirstChild("Head") and v:FindFirstChildOfClass("Humanoid") and v:FindFirstChildOfClass("Humanoid").Health > 0 then
+            local pos, vis = Camera:WorldToViewportPoint(v.Head.Position)
+            if vis then
+                local mag = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(pos.X, pos.Y)).Magnitude
+                if mag < dist then target = v.Head dist = mag end
+            end
+        end
+    end
+    return target
+end
+
+local mt = getrawmetatable(game)
+local old = mt.__index
+setreadonly(mt, false)
+mt.__index = newcclosure(function(self, idx)
+    if self == Mouse and (idx == "Hit" or idx == "Target") and Settings.SilentAim then
+        local t = GetClosest()
+        if t then return (idx == "Hit" and t.CFrame or t) end
+    end
+    return old(self, idx)
+end)
+setreadonly(mt, true)
+
+-- TriggerBot
+RunService.RenderStepped:Connect(function()
+    if Settings.TriggerBot and GetClosest() then
+        mouse1click()
     end
 end)

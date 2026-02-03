@@ -1,98 +1,128 @@
 local Settings = {
     HitboxSize = 15,
-    Enabled = true,
-    Esp = true,
+    HitboxEnabled = true,
     SilentAim = true,
+    Esp = true,
     Fov = 150
 }
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
+local Camera = workspace.CurrentCamera
+local RunService = game:GetService("RunService")
 
--- /// HÀM TẠO ESP VÀ HITBOX ///
-local function ApplyHack(model)
-    -- Tìm các bộ phận cần thiết
-    local head = model:FindFirstChild("Head") or model:FindFirstChildOfClass("MeshPart")
-    local root = model:FindFirstChild("HumanoidRootPart")
-    local hum = model:FindFirstChildOfClass("Humanoid")
+-- /// UI MENU GIAO DIỆN HIỆN ĐẠI ///
+local ScreenGui = Instance.new("ScreenGui", LocalPlayer:FindFirstChildOfClass("PlayerGui"))
+ScreenGui.Name = "ZomUltra_V4"
 
-    if head and hum and hum.Health > 0 then
-        -- 1. TẠO HITBOX HÌNH CẦU (FAKE PART)
-        local hb = head:FindFirstChild("FakeHead")
-        if Settings.Enabled then
-            if not hb then
-                hb = Instance.new("Part")
-                hb.Name = "FakeHead"
-                hb.Parent = head
-                hb.Shape = Enum.PartType.Ball
-                hb.CastShadow = false
-                hb.CanCollide = false
-                hb.Material = Enum.Material.ForceField -- Hiệu ứng đẹp, khó bị soi
-                
-                local weld = Instance.new("Weld", hb)
-                weld.Part0 = hb
-                weld.Part1 = head
-            end
-            hb.Size = Vector3.new(Settings.HitboxSize, Settings.HitboxSize, Settings.HitboxSize)
-            hb.Transparency = 0.7
-            hb.Color = Color3.new(1, 0, 0)
-        elseif hb then
-            hb:Destroy()
-        end
+local Main = Instance.new("Frame", ScreenGui)
+Main.Size = UDim2.new(0, 170, 0, 200)
+Main.Position = UDim2.new(0.05, 0, 0.3, 0)
+Main.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.Draggable = true
 
-        -- 2. TẠO ESP (CHỈ GẮN VÀO THÂN)
-        if root then
-            local box = root:FindFirstChild("ZomEsp")
-            if Settings.Esp then
-                if not box then
-                    box = Instance.new("SelectionBox", root)
-                    box.Name = "ZomEsp"
-                    box.Adornee = root
-                    box.LineThickness = 0.05
-                    box.Color3 = Color3.new(0, 1, 0)
+local Title = Instance.new("TextLabel", Main)
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Text = "ZOM ULTRA V4"
+Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.SourceSansBold
+
+local function CreateToggle(text, pos, setting)
+    local btn = Instance.new("TextButton", Main)
+    btn.Size = UDim2.new(0.9, 0, 0, 35)
+    btn.Position = UDim2.new(0.05, 0, 0, pos)
+    btn.BackgroundColor3 = Settings[setting] and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(60, 60, 60)
+    btn.Text = text .. ": " .. (Settings[setting] and "ON" or "OFF")
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.BorderSizePixel = 0
+    
+    btn.MouseButton1Click:Connect(function()
+        Settings[setting] = not Settings[setting]
+        btn.Text = text .. ": " .. (Settings[setting] and "ON" or "OFF")
+        btn.BackgroundColor3 = Settings[setting] and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(60, 60, 60)
+    end)
+end
+
+CreateToggle("Sphere Hitbox", 40, "HitboxEnabled")
+CreateToggle("Silent Aim", 80, "SilentAim")
+CreateToggle("Fixed ESP", 120, "Esp")
+
+-- /// HÀM XỬ LÝ NPC (QUÉT SÂU) ///
+local function ProcessNPC(v)
+    if v:IsA("Model") and v:FindFirstChildOfClass("Humanoid") and v ~= LocalPlayer.Character then
+        local head = v:FindFirstChild("Head") or v:FindFirstChildOfClass("MeshPart")
+        local root = v:FindFirstChild("HumanoidRootPart")
+        local hum = v:FindFirstChildOfClass("Humanoid")
+
+        if head and hum and hum.Health > 0 then
+            -- 1. Hitbox Hình Cầu (Sphere)
+            local fake = head:FindFirstChild("BallHitbox")
+            if Settings.HitboxEnabled then
+                if not fake then
+                    fake = Instance.new("Part")
+                    fake.Name = "BallHitbox"
+                    fake.Parent = head
+                    fake.Shape = Enum.PartType.Ball
+                    fake.CanCollide = false
+                    fake.CastShadow = false
+                    fake.Material = Enum.Material.ForceField
+                    local weld = Instance.new("Weld", fake)
+                    weld.Part0 = fake
+                    weld.Part1 = head
                 end
-                box.Visible = true
-            elseif box then
-                box.Visible = false
+                fake.Size = Vector3.new(Settings.HitboxSize, Settings.HitboxSize, Settings.HitboxSize)
+                fake.Transparency = 0.7
+                fake.Color = Color3.new(1, 0, 0)
+            elseif fake then
+                fake:Destroy()
+            end
+
+            -- 2. ESP Fix (Chỉ bám vào RootPart để không bị to theo đầu)
+            if root then
+                local box = root:FindFirstChild("EspBox")
+                if Settings.Esp then
+                    if not box then
+                        box = Instance.new("SelectionBox", root)
+                        box.Name = "EspBox"
+                        box.Adornee = root
+                        box.LineThickness = 0.05
+                        box.Color3 = Color3.new(0, 1, 1)
+                    end
+                elseif box then
+                    box:Destroy()
+                end
             end
         end
     end
 end
 
--- /// VÒNG LẶP QUÉT TOÀN BỘ WORKSPACE ///
+-- Vòng lặp cập nhật liên tục
 task.spawn(function()
     while task.wait(1) do
-        -- Quét trong Workspace và các Folder con (phòng trường hợp NPC nằm trong Folder)
         for _, v in ipairs(workspace:GetDescendants()) do
-            if v:IsA("Model") and v:FindFirstChildOfClass("Humanoid") and v ~= LocalPlayer.Character then
-                ApplyHack(v)
-            end
+            ProcessNPC(v)
         end
     end
 end)
 
--- /// SILENT AIM (ĐỂ BẮN TRÚNG HITBOX TO) ///
+-- /// SILENT AIM HOOK ///
 local mt = getrawmetatable(game)
 local old = mt.__index
 setreadonly(mt, false)
-
 mt.__index = newcclosure(function(self, idx)
     if self == Mouse and (idx == "Hit" or idx == "Target") and Settings.SilentAim then
         local target = nil
         local dist = Settings.Fov
-        
         for _, v in ipairs(workspace:GetDescendants()) do
-            if v:IsA("Model") and v:FindFirstChild("Head") and v ~= LocalPlayer.Character then
-                local head = v.Head
-                local pos, vis = Camera:WorldToViewportPoint(head.Position)
+            if v:IsA("Model") and v:FindFirstChild("Head") and v:FindFirstChildOfClass("Humanoid") and v:FindFirstChildOfClass("Humanoid").Health > 0 then
+                local p, vis = Camera:WorldToViewportPoint(v.Head.Position)
                 if vis then
-                    local m = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(pos.X, pos.Y)).Magnitude
-                    if m < dist then
-                        target = head
-                        dist = m
-                    end
+                    local m = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(p.X, p.Y)).Magnitude
+                    if m < dist then target = v.Head dist = m end
                 end
             end
         end
@@ -101,5 +131,3 @@ mt.__index = newcclosure(function(self, idx)
     return old(self, idx)
 end)
 setreadonly(mt, true)
-
-print("Script Loaded - Hitbox & ESP Fix Active")

@@ -1,147 +1,71 @@
 local Settings = {
-    Radius = 120, 
-    Silent = true, 
-    NoRecoil = true, 
-    Esp = true, 
-    WallCheck = true,
+    HitboxSize = 15, -- Bạn có thể chỉnh lên 15 như họ
+    HitboxTransparency = 0.8, -- 0.8 để bạn nhìn thấy khối ảo, 1 là tàng hình hoàn toàn
     Distance = 1000,
-    MaleColor = Color3.fromRGB(0, 255, 0),
-    ZombieColor = Color3.fromRGB(255, 0, 0)
+    Enabled = true
 }
 
-local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
-local Camera = workspace.CurrentCamera
+local task = task -- Dùng task để tối ưu hiệu năng
 
--- /// BIẾN TẠM ĐỂ TRÁNH LAG ///
-local LockedTarget = nil
-local Targets = {}
-
--- /// UI TỐI GIẢN ///
-local ScreenGui = Instance.new("ScreenGui", LocalPlayer:FindFirstChildOfClass("PlayerGui"))
-ScreenGui.Name = "ZomUltra_Fixed"
-ScreenGui.ResetOnSpawn = false
-
-local Main = Instance.new("Frame", ScreenGui)
-Main.Size = UDim2.new(0, 130, 0, 160)
-Main.Position = UDim2.new(0.05, 0, 0.1, 0)
-Main.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-Main.BackgroundTransparency = 0.3
-Main.Active = true
-Main.Draggable = true
-
-local function CreateBtn(text, pos, setting)
-    local btn = Instance.new("TextButton", Main)
-    btn.Size = UDim2.new(0.9, 0, 0, 25)
-    btn.Position = UDim2.new(0.05, 0, 0, pos)
-    btn.BackgroundColor3 = Settings[setting] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
-    btn.Text = text .. ": " .. (Settings[setting] and "ON" or "OFF")
-    btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.Font = Enum.Font.SourceSansBold
-    btn.TextSize = 12
+-- Hàm tạo Hitbox ảo cho từng NPC
+local function CreateFakeHitbox(model)
+    if not model:FindFirstChild("Head") or model:FindFirstChild("FakeHitbox") then return end
     
-    btn.MouseButton1Click:Connect(function()
-        Settings[setting] = not Settings[setting]
-        btn.Text = text .. ": " .. (Settings[setting] and "ON" or "OFF")
-        btn.BackgroundColor3 = Settings[setting] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
-    end)
+    local head = model.Head
+    local fakePart = Instance.new("Part")
+    
+    fakePart.Name = "FakeHitbox"
+    fakePart.Parent = model
+    fakePart.Size = Vector3.new(Settings.HitboxSize, Settings.HitboxSize, Settings.HitboxSize)
+    fakePart.Transparency = Settings.HitboxTransparency
+    fakePart.Color = Color3.fromRGB(255, 0, 0)
+    fakePart.CanCollide = false -- Không gây kẹt đường đi
+    fakePart.Anchored = false
+    fakePart.Massless = true
+    
+    -- Gắn chặt khối ảo vào đầu NPC
+    local weld = Instance.new("Weld", fakePart)
+    weld.Part0 = fakePart
+    weld.Part1 = head
+    weld.C0 = CFrame.new(0, 0, 0)
+
+    -- Đảm bảo khi NPC chết thì khối ảo biến mất
+    local hum = model:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.Died:Connect(function()
+            fakePart:Destroy()
+        end)
+    end
 end
 
-CreateBtn("Silent Aim", 10, "Silent")
-CreateBtn("No Recoil", 40, "NoRecoil")
-CreateBtn("Wall Check", 70, "WallCheck")
-CreateBtn("ESP NPC", 100, "Esp")
-
--- /// HÀM KIỂM TRA TƯỜNG (TỐI ƯU) ///
-local function IsVisible(part)
-    if not Settings.WallCheck then return true end
-    local char = LocalPlayer.Character
-    if not char then return false end
-    
-    local rayParams = RaycastParams.new()
-    rayParams.FilterType = Enum.RaycastFilterType.Exclude
-    rayParams.FilterDescendantsInstances = {char, Camera}
-    
-    local result = workspace:Raycast(Camera.CFrame.Position, (part.Position - Camera.CFrame.Position), rayParams)
-    return not result or result.Instance:IsDescendantOf(part.Parent)
-end
-
--- /// QUÉT NPC VÀ TÌM MỤC TIÊU (CHẠY RIÊNG BIỆT) ///
+-- Vòng lặp quét NPC (Tối ưu không gây lag)
 task.spawn(function()
-    while task.wait(0.1) do -- Chạy 10 lần/giây, không gây đơ
-        local newTargets = {}
-        local char = LocalPlayer.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        
+    while true do
+        if Settings.Enabled then
+            for _, obj in ipairs(workspace:GetChildren()) do
+                -- Kiểm tra đúng tên NPC trong game của bạn (Male, Zombie, v.v.)
+                if obj:IsA("Model") and (obj.Name == "Male" or obj.Name == "Zombie" or obj.Name == "Zombies") then
+                    CreateFakeHitbox(obj)
+                end
+            end
+        end
+        task.wait(2) -- Quét NPC mới mỗi 2 giây để cực nhẹ máy
+    end
+end)
+
+-- Cập nhật kích thước Hitbox theo Settings (Nếu bạn muốn đổi lúc đang chơi)
+task.spawn(function()
+    while task.wait(1) do
         for _, obj in ipairs(workspace:GetChildren()) do
-            if obj:IsA("Model") and (obj.Name == "Male" or obj.Name == "Zombie" or obj.Name == "Zombies") then
-                local head = obj:FindFirstChild("Head")
-                local hum = obj:FindFirstChildOfClass("Humanoid")
-                
-                if head and hum and hum.Health > 0 then
-                    table.insert(newTargets, head)
-                    
-                    -- Quản lý ESP thông minh
-                    local hl = obj:FindFirstChild("ZomH")
-                    if Settings.Esp then
-                        if not hl then
-                            hl = Instance.new("Highlight", obj)
-                            hl.Name = "ZomH"
-                        end
-                        hl.FillColor = (obj.Name == "Male") and Settings.MaleColor or Settings.ZombieColor
-                        hl.Enabled = true
-                    elseif hl then
-                        hl.Enabled = false
-                    end
+            local fake = obj:FindFirstChild("FakeHitbox")
+            if fake then
+                if Settings.Enabled then
+                    fake.Size = Vector3.new(Settings.HitboxSize, Settings.HitboxSize, Settings.HitboxSize)
+                else
+                    fake.Size = Vector3.new(0.01, 0.01, 0.01) -- Thu nhỏ khi tắt
                 end
             end
-        end
-        Targets = newTargets
-        
-        -- Tìm mục tiêu gần chuột nhất và lưu vào biến LockedTarget
-        local best = nil
-        local minDist = Settings.Radius
-        
-        if Settings.Silent then
-            for _, head in ipairs(Targets) do
-                local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
-                if onScreen and IsVisible(head) then
-                    local d = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(pos.X, pos.Y)).Magnitude
-                    if d < minDist then
-                        best = head
-                        minDist = d
-                    end
-                end
-            end
-        end
-        LockedTarget = best
-    end
-end)
-
--- /// SILENT AIM HOOK (SIÊU NHẸ) ///
-local mt = getrawmetatable(game)
-local oldIdx = mt.__index
-setreadonly(mt, false)
-
-mt.__index = newcclosure(function(self, idx)
-    -- Chỉ lấy giá trị đã tính sẵn, không tính toán lại trong này
-    if not checkcaller() and Settings.Silent and self == Mouse and (idx == "Hit" or idx == "Target") then
-        if LockedTarget then
-            return (idx == "Hit" and LockedTarget.CFrame or LockedTarget)
-        end
-    end
-    return oldIdx(self, idx)
-end)
-setreadonly(mt, true)
-
--- /// NO RECOIL ///
-RunService.RenderStepped:Connect(function()
-    if Settings.NoRecoil then
-        local recoil = Camera:FindFirstChild("Recoil") or Camera:FindFirstChild("Spring")
-        if recoil and (recoil:IsA("Vector3Value") or recoil:IsA("NumberValue")) then 
-            recoil.Value = recoil:IsA("Vector3Value") and Vector3.new(0,0,0) or 0 
         end
     end
 end)

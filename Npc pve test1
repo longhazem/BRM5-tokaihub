@@ -1,133 +1,127 @@
+-- Chờ game tải xong hoàn toàn
+if not game:IsLoaded() then game.Loaded:Wait() end
+
 local Settings = {
     HitboxSize = 15,
     HitboxEnabled = true,
     SilentAim = true,
     Esp = true,
-    Fov = 150
 }
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
 local Camera = workspace.CurrentCamera
-local RunService = game:GetService("RunService")
+local Mouse = LocalPlayer:GetMouse()
 
--- /// UI MENU GIAO DIỆN HIỆN ĐẠI ///
-local ScreenGui = Instance.new("ScreenGui", LocalPlayer:FindFirstChildOfClass("PlayerGui"))
-ScreenGui.Name = "ZomUltra_V4"
+-- /// TẠO UI (DÙNG PROTECTED GUI) ///
+local ScreenGui = Instance.new("ScreenGui")
+-- Thử đưa vào CoreGui nếu trình thực thi của bạn hỗ trợ, nếu không thì vào PlayerGui
+local Success, Error = pcall(function()
+    ScreenGui.Parent = game:GetService("CoreGui")
+end)
+if not Success then
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end
 
 local Main = Instance.new("Frame", ScreenGui)
-Main.Size = UDim2.new(0, 170, 0, 200)
-Main.Position = UDim2.new(0.05, 0, 0.3, 0)
-Main.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-Main.BorderSizePixel = 0
+Main.Size = UDim2.new(0, 160, 0, 180)
+Main.Position = UDim2.new(0.1, 0, 0.4, 0)
+Main.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Main.BorderSizePixel = 2
 Main.Active = true
 Main.Draggable = true
 
 local Title = Instance.new("TextLabel", Main)
 Title.Size = UDim2.new(1, 0, 0, 30)
-Title.Text = "ZOM ULTRA V4"
-Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+Title.Text = "ZOM FIX 100%"
 Title.TextColor3 = Color3.new(1, 1, 1)
-Title.Font = Enum.Font.SourceSansBold
+Title.BackgroundColor3 = Color3.fromRGB(60, 0, 0)
 
-local function CreateToggle(text, pos, setting)
+local function CreateBtn(text, pos, setting)
     local btn = Instance.new("TextButton", Main)
     btn.Size = UDim2.new(0.9, 0, 0, 35)
     btn.Position = UDim2.new(0.05, 0, 0, pos)
-    btn.BackgroundColor3 = Settings[setting] and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(60, 60, 60)
-    btn.Text = text .. ": " .. (Settings[setting] and "ON" or "OFF")
-    btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.BorderSizePixel = 0
+    btn.Text = text .. ": ON"
+    btn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
     
     btn.MouseButton1Click:Connect(function()
         Settings[setting] = not Settings[setting]
-        btn.Text = text .. ": " .. (Settings[setting] and "ON" or "OFF")
-        btn.BackgroundColor3 = Settings[setting] and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(60, 60, 60)
+        btn.Text = text .. (Settings[setting] and ": ON" or ": OFF")
+        btn.BackgroundColor3 = Settings[setting] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(150, 0, 0)
     end)
 end
 
-CreateToggle("Sphere Hitbox", 40, "HitboxEnabled")
-CreateToggle("Silent Aim", 80, "SilentAim")
-CreateToggle("Fixed ESP", 120, "Esp")
+CreateBtn("Hitbox 15", 40, "HitboxEnabled")
+CreateBtn("Silent Aim", 85, "SilentAim")
+CreateBtn("ESP Body", 130, "Esp")
 
--- /// HÀM XỬ LÝ NPC (QUÉT SÂU) ///
-local function ProcessNPC(v)
-    if v:IsA("Model") and v:FindFirstChildOfClass("Humanoid") and v ~= LocalPlayer.Character then
-        local head = v:FindFirstChild("Head") or v:FindFirstChildOfClass("MeshPart")
-        local root = v:FindFirstChild("HumanoidRootPart")
-        local hum = v:FindFirstChildOfClass("Humanoid")
+-- /// HÀM XỬ LÝ NPC QUÉT MỌI NGÓC NGÁCH ///
+local function UpdateNPCs()
+    for _, v in ipairs(workspace:GetDescendants()) do
+        if v:IsA("Model") and v:FindFirstChildOfClass("Humanoid") and v ~= LocalPlayer.Character then
+            local head = v:FindFirstChild("Head") or v:FindFirstChildOfClass("MeshPart")
+            local root = v:FindFirstChild("HumanoidRootPart")
+            local hum = v:FindFirstChildOfClass("Humanoid")
 
-        if head and hum and hum.Health > 0 then
-            -- 1. Hitbox Hình Cầu (Sphere)
-            local fake = head:FindFirstChild("BallHitbox")
-            if Settings.HitboxEnabled then
-                if not fake then
-                    fake = Instance.new("Part")
-                    fake.Name = "BallHitbox"
-                    fake.Parent = head
-                    fake.Shape = Enum.PartType.Ball
-                    fake.CanCollide = false
-                    fake.CastShadow = false
-                    fake.Material = Enum.Material.ForceField
-                    local weld = Instance.new("Weld", fake)
-                    weld.Part0 = fake
-                    weld.Part1 = head
-                end
-                fake.Size = Vector3.new(Settings.HitboxSize, Settings.HitboxSize, Settings.HitboxSize)
-                fake.Transparency = 0.7
-                fake.Color = Color3.new(1, 0, 0)
-            elseif fake then
-                fake:Destroy()
-            end
-
-            -- 2. ESP Fix (Chỉ bám vào RootPart để không bị to theo đầu)
-            if root then
-                local box = root:FindFirstChild("EspBox")
-                if Settings.Esp then
-                    if not box then
-                        box = Instance.new("SelectionBox", root)
-                        box.Name = "EspBox"
-                        box.Adornee = root
-                        box.LineThickness = 0.05
-                        box.Color3 = Color3.new(0, 1, 1)
+            if head and hum and hum.Health > 0 then
+                -- Hitbox hình cầu
+                local ball = head:FindFirstChild("BallHB")
+                if Settings.HitboxEnabled then
+                    if not ball then
+                        ball = Instance.new("Part", head)
+                        ball.Name = "BallHB"
+                        ball.Shape = Enum.PartType.Ball
+                        ball.CanCollide = false
+                        ball.Material = Enum.Material.ForceField
+                        local w = Instance.new("Weld", ball)
+                        w.Part0 = ball; w.Part1 = head
                     end
-                elseif box then
-                    box:Destroy()
+                    ball.Size = Vector3.new(Settings.HitboxSize, Settings.HitboxSize, Settings.HitboxSize)
+                    ball.Transparency = 0.7
+                    ball.Color = Color3.new(1, 0, 0)
+                elseif ball then ball:Destroy() end
+
+                -- ESP Fix
+                if root then
+                    local box = root:FindFirstChild("SelectionBox")
+                    if Settings.Esp then
+                        if not box then
+                            box = Instance.new("SelectionBox", root)
+                            box.Adornee = root
+                            box.LineThickness = 0.05
+                            box.Color3 = Color3.new(0, 1, 0)
+                        end
+                    elseif box then box:Destroy() end
                 end
             end
         end
     end
 end
 
--- Vòng lặp cập nhật liên tục
+-- Vòng lặp quét cực nhanh
 task.spawn(function()
-    while task.wait(1) do
-        for _, v in ipairs(workspace:GetDescendants()) do
-            ProcessNPC(v)
-        end
+    while task.wait(0.5) do
+        UpdateNPCs()
     end
 end)
 
--- /// SILENT AIM HOOK ///
-local mt = getrawmetatable(game)
-local old = mt.__index
-setreadonly(mt, false)
-mt.__index = newcclosure(function(self, idx)
-    if self == Mouse and (idx == "Hit" or idx == "Target") and Settings.SilentAim then
-        local target = nil
-        local dist = Settings.Fov
+-- Silent Aim (Hook cơ bản nhất để tránh lỗi)
+local old; old = hookmetamethod(game, "__index", function(self, k)
+    if self == Mouse and (k == "Hit" or k == "Target") and Settings.SilentAim then
+        local t = nil
+        local d = 200
         for _, v in ipairs(workspace:GetDescendants()) do
-            if v:IsA("Model") and v:FindFirstChild("Head") and v:FindFirstChildOfClass("Humanoid") and v:FindFirstChildOfClass("Humanoid").Health > 0 then
+            if v:IsA("Model") and v:FindFirstChild("Head") and v ~= LocalPlayer.Character then
                 local p, vis = Camera:WorldToViewportPoint(v.Head.Position)
                 if vis then
                     local m = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(p.X, p.Y)).Magnitude
-                    if m < dist then target = v.Head dist = m end
+                    if m < d then t = v.Head; d = m end
                 end
             end
         end
-        if target then return (idx == "Hit" and target.CFrame or target) end
+        if t then return (k == "Hit" and t.CFrame or t) end
     end
-    return old(self, idx)
+    return old(self, k)
 end)
-setreadonly(mt, true)
+
+print("--- SCRIPT SIÊU CẤP ĐÃ CHẠY ---")

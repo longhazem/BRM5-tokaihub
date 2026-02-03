@@ -1,106 +1,165 @@
 local a = {
-    b = 150,
-    c = true,
-    d = true
+    b = 250, -- Bán kính quét chuột (Pixels)
+    c = true, -- Silent Aim
+    d = true, -- No Recoil
+    e = true, -- ESP
+    f = true, -- Wall Check (Kiểm tra tường)
+    g = 1500  -- Tầm xa quét NPC
 }
 
-local e = game:GetService("Players")
-local f = game:GetService("RunService")
-local g = e.LocalPlayer
-local h = g:GetMouse()
-local i = workspace.CurrentCamera
+local h = game:GetService("Players")
+local i = game:GetService("RunService")
+local j = h.LocalPlayer
+local k = j:GetMouse()
+local l = workspace.CurrentCamera
 
-local j = Instance.new("ScreenGui", g:FindFirstChildOfClass("PlayerGui"))
-j.Name = " "
-j.ResetOnSpawn = false
+-- /// GIAO DIỆN ///
+local m = Instance.new("ScreenGui", j:FindFirstChildOfClass("PlayerGui"))
+m.Name = " "
+m.ResetOnSpawn = false
 
-local k = Instance.new("Frame", j)
-k.Size = UDim2.new(0, 160, 0, 110)
-k.Position = UDim2.new(0.1, 0, 0.4, 0)
-k.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-k.BorderSizePixel = 0
-k.Active = true
-k.Draggable = true
+local n = Instance.new("Frame", m)
+n.Size = UDim2.new(0, 160, 0, 180)
+n.Position = UDim2.new(0.1, 0, 0.4, 0)
+n.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+n.BorderSizePixel = 0
+n.Active = true
+n.Draggable = true
+Instance.new("UICorner", n).CornerRadius = UDim.new(0, 8)
 
-Instance.new("UICorner", k).CornerRadius = UDim.new(0, 8)
+local function o(p, q, r)
+    local s = Instance.new("TextButton", n)
+    s.Size = UDim2.new(0.9, 0, 0, 30)
+    s.Position = UDim2.new(0.05, 0, 0, q)
+    s.BackgroundColor3 = a[r] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(60, 60, 60)
+    s.Text = p .. ": " .. (a[r] and "ON" or "OFF")
+    s.TextColor3 = Color3.new(1, 1, 1)
+    s.Font = Enum.Font.SourceSans
+    Instance.new("UICorner", s)
 
-local function l(m, n, o)
-    local p = Instance.new("TextButton", k)
-    p.Size = UDim2.new(0.9, 0, 0, 35)
-    p.Position = UDim2.new(0.05, 0, 0, n)
-    p.BackgroundColor3 = a[o] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(60, 60, 60)
-    p.Text = m .. ": " .. (a[o] and "ON" or "OFF")
-    p.TextColor3 = Color3.new(1, 1, 1)
-    p.Font = Enum.Font.SourceSans
-    p.TextSize = 14
-    Instance.new("UICorner", p)
-
-    p.MouseButton1Click:Connect(function()
-        a[o] = not a[o]
-        p.Text = m .. ": " .. (a[o] and "ON" or "OFF")
-        p.BackgroundColor3 = a[o] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(60, 60, 60)
+    s.MouseButton1Click:Connect(function()
+        a[r] = not a[r]
+        s.Text = p .. ": " .. (a[r] and "ON" or "OFF")
+        s.BackgroundColor3 = a[r] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(60, 60, 60)
     end)
 end
 
-l("Silent", 40, "c")
-l("Recoil", 80, "d")
+o("Silent Aim", 40, "c")
+o("No Recoil", 75, "d")
+o("Wall Check", 110, "f")
+o("ESP NPC", 145, "e")
 
-local q = {}
-task.spawn(function()
-    while task.wait(0.5) do
-        local r = {}
-        for _, s in ipairs(workspace:GetChildren()) do
-            if s:IsA("Model") and (s.Name == "Male" or s.Name == "Zombie" or s.Name == "Zombies") then
-                local t = s:FindFirstChild("Head")
-                local u = s:FindFirstChildOfClass("Humanoid")
-                if t and u and u.Health > 0 then
-                    table.insert(r, t)
-                end
-            end
-        end
-        q = r
+-- /// HÀM KIỂM TRA TƯỜNG (CRITICAL) ///
+local function p(q)
+    if not a.f then return true end -- Nếu tắt Wall Check thì coi như luôn thấy
+    
+    local r = j.Character
+    if not r then return false end
+    
+    local s = RaycastParams.new()
+    s.FilterType = Enum.RaycastFilterType.Exclude
+    s.FilterDescendantsInstances = {r, l} -- Bỏ qua bản thân và camera
+    
+    local t = l.CFrame.Position
+    local u = q.Position - t
+    local v = workspace:Raycast(t, u, s)
+    
+    -- Chỉ trả về true nếu tia bắn trúng NPC hoặc không trúng gì (đường trống)
+    if not v or v.Instance:IsDescendantOf(q.Parent) then
+        return true
     end
-end)
+    return false
+end
 
-local v = getrawmetatable(game)
-local w = v.__index
-setreadonly(v, false)
-
-v.__index = newcclosure(function(self, x)
-    if not checkcaller() and a.c and self == h and (x == "Hit" or x == "Target") then
-        local y = nil
-        local z = a.b
-
-        for _, A in ipairs(q) do
-            if A and A.Parent then
-                local B, C = i:WorldToViewportPoint(A.Position)
-                if C then
-                    local D = (Vector2.new(h.X, h.Y) - Vector2.new(B.X, B.Y)).Magnitude
-                    if D < z then
-                        y = A
-                        z = D
+-- /// QUÉT MỤC TIÊU ///
+local w = {}
+i.Heartbeat:Connect(function()
+    local x = {}
+    local y = (j.Character and j.Character:FindFirstChild("HumanoidRootPart")) and j.Character.HumanoidRootPart.Position or Vector3.zero
+    
+    for _, z in ipairs(workspace:GetDescendants()) do
+        if z:IsA("Model") and z:FindFirstChildOfClass("Humanoid") then
+            if not h:GetPlayerFromCharacter(z) and z ~= j.Character then
+                local A = z:FindFirstChild("Head")
+                local B = z:FindFirstChildOfClass("Humanoid")
+                
+                if A and B and B.Health > 0 then
+                    local C = (A.Position - y).Magnitude
+                    if C < a.g then
+                        -- Vẽ ESP
+                        if a.e then
+                            if not z:FindFirstChild("ZomH") then
+                                local D = Instance.new("Highlight", z)
+                                D.Name = "ZomH"
+                                D.FillColor = Color3.new(1, 0, 0)
+                                D.FillTransparency = 0.6
+                            end
+                        end
+                        table.insert(x, A)
                     end
                 end
             end
         end
+    end
+    w = x
+end)
 
-        if y then
-            return (x == "Hit" and y.CFrame or y)
+-- /// SILENT AIM LOGIC ///
+local function E()
+    local F = nil
+    local G = a.b
+    
+    for _, H in ipairs(w) do
+        local I, J = l:WorldToViewportPoint(H.Position)
+        if J then
+            -- Kiểm tra Wall Check trước khi đưa vào danh sách ngắm
+            if p(H) then
+                local K = (Vector2.new(k.X, k.Y) - Vector2.new(I.X, I.Y)).Magnitude
+                if K < G then
+                    F = H
+                    G = K
+                end
+            end
         end
     end
-    return w(self, x)
-end)
-setreadonly(v, true)
+    return F
+end
 
-f.RenderStepped:Connect(function()
+local L = getrawmetatable(game)
+local M = L.__index
+local N = L.__namecall
+setreadonly(L, false)
+
+L.__index = newcclosure(function(self, O)
+    if not checkcaller() and a.c and self == k and (O == "Hit" or O == "Target") then
+        local P = E()
+        if P then return (O == "Hit" and P.CFrame or P) end
+    end
+    return M(self, O)
+end)
+
+L.__namecall = newcclosure(function(self, ...)
+    local Q = getnamecallmethod()
+    local R = {...}
+    
+    if not checkcaller() and a.c and Q == "Raycast" and self == workspace then
+        local P = E()
+        if P then
+            -- Bẻ hướng đạn thẳng vào đầu NPC nếu không vướng tường
+            R[2] = (P.Position - R[1]).Unit * R[2].Magnitude
+            return N(self, unpack(R))
+        end
+    end
+    return N(self, ...)
+end)
+setreadonly(L, true)
+
+-- /// NO RECOIL ///
+i.RenderStepped:Connect(function()
     if a.d then
-        local E = i:FindFirstChild("Spring") or i:FindFirstChild("Recoil")
-        if E then
-            if E:IsA("Vector3Value") then
-                E.Value = Vector3.zero
-            elseif E:IsA("NumberValue") then
-                E.Value = 0
-            end
+        local S = l:FindFirstChild("Recoil") or l:FindFirstChild("Spring")
+        if S and S:IsA("Vector3Value") then
+            S.Value = Vector3.new(0, 0, 0)
         end
     end
 end)

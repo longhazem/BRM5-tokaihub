@@ -1,5 +1,5 @@
 -- Clears the console output before starting the script
-print("Starting script with Red Sphere ESP - FULL UI RESTORED...")
+print("Starting script with Sphere ESP & Custom Colors...")
 if typeof(clear) == "function" then clear() end
 
 -- SERVICES
@@ -33,9 +33,9 @@ local fastScanEnabled = false
 
 local patchOptions = { recoil = false, firemodes = false }
 
--- [MÀU ĐỎ NHƯ BẠN MUỐN]
-local visibleColor = Color3.fromRGB(255, 0, 0)
-local hiddenColor = Color3.fromRGB(255, 0, 0)
+-- COLORS
+local maleColor = Color3.fromRGB(0, 255, 0)
+local zombieColor = Color3.fromRGB(255, 0, 0)
 
 local originalLighting = {
     Brightness = lighting.Brightness,
@@ -66,16 +66,15 @@ local function isValidNPC(model)
     return isTargetName
 end
 
--- [HÌNH DẠNG ĐẦU & MÀU ĐỎ]
+-- TẠO HÌNH CẦU (SPHERE)
 local function createBoxForPart(part)
     if not part or part:FindFirstChild("Wall_Box") then return end
-    local sphere = Instance.new("SphereHandleAdornment") 
+    local sphere = Instance.new("SphereHandleAdornment")
     sphere.Name = "Wall_Box"
-    sphere.Radius = 1.1 
+    sphere.Radius = 1.2
     sphere.Adornee = part
     sphere.AlwaysOnTop = true 
     sphere.ZIndex = 10
-    sphere.Color3 = visibleColor -- Màu đỏ
     sphere.Transparency = 0.1
     sphere.Parent = part
     trackedParts[part] = true
@@ -92,6 +91,7 @@ local function applySilentHitbox(model, root)
     if not originalSizes[model] then originalSizes[model] = root.Size end
     root.Size = TARGET_HITBOX_SIZE
     root.Transparency = showHitbox and 0.85 or 1 
+    root.Color = Color3.fromRGB(255, 0, 0) -- HITBOX MÀU ĐỎ
     root.CanCollide = true
 end
 
@@ -114,7 +114,7 @@ local function addNPC(model)
     if wallEnabled then createBoxForPart(head or root) end
 end
 
--- Weapon Mods logic preserved
+-- Weapon Mods
 local function patchWeapons(options)
     local weaponsFolder = RS:FindFirstChild("Shared")
         and RS.Shared:FindFirstChild("Configs")
@@ -146,10 +146,10 @@ local function patchWeapons(options)
     end
 end
 
---- GUI CREATION (RESTORED FULL) ---
+--- GUI CREATION (100% ORIGINAL) ---
 
 local sg = Instance.new("ScreenGui", localPlayer.PlayerGui)
-sg.Name = "tokai_Full_RedSphere"
+sg.Name = "tokai_Premium_V6_Scan"
 sg.ResetOnSpawn = false
 sg.DisplayOrder = 9999
 
@@ -179,7 +179,6 @@ toggleBtn.MouseButton1Click:Connect(function()
     main.Visible = guiVisible
 end)
 
--- Dragging Logic preserved
 local dragging, dragInput, dragStart, startPos
 local function updateDrag(input)
     local delta = input.Position - dragStart
@@ -292,14 +291,14 @@ local function createButton(parent, text, cb)
     end)
 end
 
--- TABS CONTENT RESTORED
 createButton(tabCombat, "Silent Hitbox (All NPCs)", function(v) silentEnabled = v end)
 createButton(tabCombat, "Show Hitbox", function(v) showHitbox = v end)
 
-createButton(tabVisuals, "ESP Head Sphere (Red)", function(v)
+createButton(tabVisuals, "ESP Sphere (Male:G, Zomb:R)", function(v)
     wallEnabled = v
     if wallEnabled then for _, d in pairs(activeNPCs) do createBoxForPart(d.head) end else destroyAllBoxes() end
 end)
+
 createButton(tabVisuals, "Auto Fast Scan (Update)", function(v)
     fastScanEnabled = v
     if v then
@@ -317,14 +316,12 @@ end)
 createButton(tabWeapons, "Anti-Recoil", function(v) patchOptions.recoil = v patchWeapons(patchOptions) end)
 createButton(tabWeapons, "Unlock Firemodes", function(v) patchOptions.firemodes = v patchWeapons(patchOptions) end)
 
--- CREDITS
 local cr = Instance.new("TextLabel", tabCredits)
 cr.Size = UDim2.new(1,0,0,100)
 cr.Text = "tokai"
 cr.TextColor3 = Color3.new(1,1,1)
 cr.BackgroundTransparency = 1
 
--- UNLOAD
 local unl = Instance.new("TextButton", sidebar)
 unl.Size = UDim2.new(0, 110, 0, 35)
 unl.Text = "Unload Script"
@@ -335,15 +332,29 @@ unl.MouseButton1Click:Connect(function()
     isUnloaded = true
     destroyAllBoxes()
     for m, _ in pairs(activeNPCs) do restoreOriginalSize(m) end
+    for _, c in ipairs(wallConnections) do pcall(function() c:Disconnect() end) end
     sg:Destroy()
 end)
 
---- LOOPS ---
+--- MAIN LOOPS ---
+
+for _, m in ipairs(Workspace:GetChildren()) do
+    if m:IsA("Model") and isValidNPC(m) then addNPC(m) end
+end
+
+table.insert(wallConnections, Workspace.ChildAdded:Connect(function(m)
+    if m:IsA("Model") then 
+        task.delay(0.5, function() if isValidNPC(m) then addNPC(m) end end) 
+    end
+end))
+
 task.spawn(function()
     while not isUnloaded do
         if fastScanEnabled then
             for _, m in ipairs(Workspace:GetChildren()) do
-                if m:IsA("Model") and not activeNPCs[m] and isValidNPC(m) then addNPC(m) end
+                if m:IsA("Model") and not activeNPCs[m] then
+                    if isValidNPC(m) then addNPC(m) end
+                end
             end
         end
         task.wait(0.5)
@@ -352,11 +363,27 @@ end)
 
 RunService.RenderStepped:Connect(function()
     if isUnloaded then return end
+
     if fullBrightEnabled then
-        lighting.Brightness = 2 lighting.ClockTime = 12 lighting.GlobalShadows = false lighting.Ambient = Color3.new(1, 1, 1)
+        lighting.Brightness = 2
+        lighting.ClockTime = 12
+        lighting.GlobalShadows = false
+        lighting.Ambient = Color3.new(1, 1, 1)
     end
+
     for m, d in pairs(activeNPCs) do
         if not m.Parent then activeNPCs[m] = nil continue end
+        
+        -- LOGIC PHÂN CHIA MÀU ESP HÌNH CẦU
+        if wallEnabled and d.head and d.head:FindFirstChild("Wall_Box") then
+            local name = m.Name:lower()
+            if name == "zombie" or name == "zombies" then
+                d.head.Wall_Box.Color3 = zombieColor -- Màu đỏ cho Zombie
+            else
+                d.head.Wall_Box.Color3 = maleColor -- Màu xanh lá cho Male
+            end
+        end
+
         if silentEnabled then applySilentHitbox(m, d.root) end
     end
 end)

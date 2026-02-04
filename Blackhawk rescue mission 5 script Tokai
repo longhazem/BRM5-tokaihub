@@ -78,7 +78,7 @@ local function createBoxForPart(part)
     box.AlwaysOnTop = true 
     box.ZIndex = 10
     box.Color3 = visibleColor
-    box.Transparency = 0.3
+    box.Transparency = 0.5
     box.Parent = part
     trackedParts[part] = true
 end

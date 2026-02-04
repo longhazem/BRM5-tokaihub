@@ -1,224 +1,388 @@
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
+-- Clears the console output before starting the script
+print("Starting script with Zombie support...")
+if typeof(clear) == "function" then clear() end
+
+-- SERVICES
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
-local CoreGui = (gethui and gethui()) or game.CoreGui
+local TweenService = game:GetService("TweenService")
+local RS = game:GetService("ReplicatedStorage")
+local lighting = game:GetService("Lighting")
 
-local TARGET_HITBOX_SIZE = Vector3.new(20, 20, 20) 
+-- SETTINGS & VARIABLES
+local localPlayer = Players.LocalPlayer
+local camera = Workspace.CurrentCamera
+
+local TARGET_HITBOX_SIZE = Vector3.new(15, 15, 15)
+
 local activeNPCs = {}      
+local trackedParts = {}    
 local originalSizes = {}   
+local wallConnections = {} 
 
+-- TOGGLES
+local wallEnabled = false       
 local silentEnabled = false     
 local showHitbox = false        
-local espEnabled = false
+local fullBrightEnabled = false 
+local guiVisible = true         
+local isUnloaded = false        
 
-local function getTargetPart(model)
-    return model:FindFirstChild("Head") or model:FindFirstChild("HumanoidRootPart")
+local patchOptions = { recoil = false, firemodes = false }
+
+-- COLORS
+local visibleR, visibleG, visibleB = 255, 0, 0    
+local hiddenR, hiddenG, hiddenB = 255, 0, 0       
+local visibleColor = Color3.fromRGB(visibleR, visibleG, visibleB)
+local hiddenColor = Color3.fromRGB(hiddenR, hiddenG, hiddenB)
+
+local originalLighting = {
+    Brightness = lighting.Brightness,
+    ClockTime = lighting.ClockTime,
+    FogEnd = lighting.FogEnd,
+    GlobalShadows = lighting.GlobalShadows,
+    Ambient = lighting.Ambient
+}
+
+--- HELPER FUNCTIONS ---
+
+local function getRootPart(model)
+    return model:FindFirstChild("Root") or model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("UpperTorso")
 end
 
+-- Cập nhật hàm kiểm tra NPC: Chấp nhận Male (AI), Zombie hoặc Zombies
 local function isValidNPC(model)
     local name = model.Name:lower()
-    if name == "male" or name == "zombie" or name == "zombies" then
-        if name == "male" then
-            for _, c in ipairs(model:GetChildren()) do
-                if type(c.Name) == "string" and c.Name:sub(1, 3) == "AI_" then return true end
-            end
-            return false
-        end
-        return true
-    end
-    return false
-end
-
-local Library = {}
-function Library:CreateWindow()
-    local sg = Instance.new("ScreenGui", CoreGui)
-    sg.Name = "TOKAI_PRO"
-    sg.ResetOnSpawn = false
-
-    local miniBtn = Instance.new("TextButton", sg)
-    miniBtn.Size = UDim2.new(0, 50, 0, 50)
-    miniBtn.Position = UDim2.new(0, 10, 0.5, -25)
-    miniBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    miniBtn.Text = "T"
-    miniBtn.TextColor3 = Color3.new(1,1,1)
-    miniBtn.Visible = false
-    Instance.new("UICorner", miniBtn)
-
-    local main = Instance.new("Frame", sg)
-    main.Size = UDim2.new(0, 520, 0, 320)
-    main.Position = UDim2.new(0.5, 0, 0.5, 0)
-    main.AnchorPoint = Vector2.new(0.5, 0.5)
-    main.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-    Instance.new("UICorner", main)
+    local isTargetName = (name == "male" or name == "zombie" or name == "zombies")
     
-    local stroke = Instance.new("UIStroke", main)
-    stroke.Thickness = 2
-    coroutine.wrap(function()
-        local h = 0
-        while true do
-            h = h + 1/350
-            stroke.Color = Color3.fromHSV(h%1, 0.6, 1)
-            RunService.RenderStepped:Wait()
+    -- Nếu là Male thì check thêm AI child đặc thù của BRM5
+    if name == "male" then
+        local hasAI = false
+        for _, c in ipairs(model:GetChildren()) do
+            if type(c.Name) == "string" and c.Name:sub(1, 3) == "AI_" then hasAI = true break end
         end
-    end)()
-
-    local closeBtn = Instance.new("TextButton", main)
-    closeBtn.Size = UDim2.new(0, 30, 0, 30)
-    closeBtn.Position = UDim2.new(1, -35, 0, 5)
-    closeBtn.Text = "X"
-    closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    closeBtn.TextColor3 = Color3.new(1,1,1)
-    Instance.new("UICorner", closeBtn)
-
-    closeBtn.MouseButton1Click:Connect(function()
-        main.Visible = false
-        miniBtn.Visible = true
-    end)
-
-    miniBtn.MouseButton1Click:Connect(function()
-        main.Visible = true
-        miniBtn.Visible = false
-    end)
-
-    local sidebar = Instance.new("Frame", main)
-    sidebar.Size = UDim2.new(0, 150, 1, 0)
-    sidebar.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
-    Instance.new("UICorner", sidebar)
-
-    local pages = Instance.new("Frame", main)
-    pages.Size = UDim2.new(1, -170, 1, -20)
-    pages.Position = UDim2.new(0, 160, 0, 10)
-    pages.BackgroundTransparency = 1
-
-    local tabList = Instance.new("ScrollingFrame", sidebar)
-    tabList.Size = UDim2.new(1, 0, 1, -50)
-    tabList.Position = UDim2.new(0, 0, 0, 40)
-    tabList.BackgroundTransparency = 1
-    tabList.ScrollBarThickness = 0
-    Instance.new("UIListLayout", tabList).HorizontalAlignment = "Center"
-
-    local first = true
-    function Library:CreateTab(name)
-        local page = Instance.new("ScrollingFrame", pages)
-        page.Size = UDim2.new(1, 0, 1, 0)
-        page.BackgroundTransparency = 1
-        page.Visible = false
-        page.ScrollBarThickness = 0
-        Instance.new("UIListLayout", page).Padding = UDim.new(0, 8)
-
-        local tBtn = Instance.new("TextButton", tabList)
-        tBtn.Size = UDim2.new(0, 130, 0, 35)
-        tBtn.Text = name
-        tBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-        tBtn.TextColor3 = Color3.new(1,1,1)
-        Instance.new("UICorner", tBtn)
-
-        tBtn.MouseButton1Click:Connect(function()
-            for _, v in pairs(pages:GetChildren()) do v.Visible = false end
-            page.Visible = true
-        end)
-        if first then page.Visible = true first = false end
-
-        local el = {}
-        function el:AddToggle(txt, cb)
-            local b = Instance.new("TextButton", page)
-            b.Size = UDim2.new(1, -10, 0, 38)
-            b.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-            b.Text = "  " .. txt
-            b.TextColor3 = Color3.fromRGB(200, 200, 200)
-            b.TextXAlignment = "Left"
-            Instance.new("UICorner", b)
-            local s = false
-            b.MouseButton1Click:Connect(function()
-                s = not s
-                b.BackgroundColor3 = s and Color3.fromRGB(50, 50, 50) or Color3.fromRGB(30, 30, 30)
-                cb(s)
-            end)
-        end
-
-        function el:AddBox(txt, ph, cb)
-            local f = Instance.new("Frame", page)
-            f.Size = UDim2.new(1, -10, 0, 45)
-            f.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-            Instance.new("UICorner", f)
-            local l = Instance.new("TextLabel", f)
-            l.Text = "  " .. txt
-            l.Size = UDim2.new(0.6, 0, 1, 0)
-            l.BackgroundTransparency = 1
-            l.TextColor3 = Color3.new(1,1,1)
-            l.TextXAlignment = "Left"
-            local i = Instance.new("TextBox", f)
-            i.Size = UDim2.new(0.3, 0, 0.7, 0)
-            i.Position = UDim2.new(0.65, 0, 0.15, 0)
-            i.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-            i.Text = ph
-            i.TextColor3 = Color3.new(1,1,1)
-            Instance.new("UICorner", i)
-            i.FocusLost:Connect(function(e) if e then cb(i.Text) end end)
-        end
-        return el
+        return hasAI
     end
-    return Library
+    
+    return isTargetName
 end
 
-local win = Library:CreateWindow()
-local combat = win:CreateTab("Combat")
-local visual = win:CreateTab("ESP")
+local function createBoxForPart(part)
+    if not part or part:FindFirstChild("Wall_Box") then return end
+    local box = Instance.new("BoxHandleAdornment")
+    box.Name = "Wall_Box"
+    box.Size = part.Size + Vector3.new(0.1, 0.1, 0.1)
+    box.Adornee = part
+    box.AlwaysOnTop = true 
+    box.ZIndex = 10
+    box.Color3 = visibleColor
+    box.Transparency = 0.3
+    box.Parent = part
+    trackedParts[part] = true
+end
 
-combat:AddToggle("Enable Hitbox", function(v) silentEnabled = v end)
-combat:AddToggle("Show Hitbox", function(v) showHitbox = v end)
-combat:AddBox("Hitbox Size", "20", function(val)
-    local n = tonumber(val)
-    if n then TARGET_HITBOX_SIZE = Vector3.new(n, n, n) end
+local function destroyAllBoxes()
+    for part, _ in pairs(trackedParts) do
+        if part and part:FindFirstChild("Wall_Box") then pcall(function() part.Wall_Box:Destroy() end) end
+    end
+    trackedParts = {}
+end
+
+local function applySilentHitbox(model, root)
+    if not originalSizes[model] then originalSizes[model] = root.Size end
+    local head = model:FindFirstChild("Head")
+    if head then
+        root.Size = head.Size  -- Thay đổi kích thước hitbox thành kích thước của đầu NPC
+    else
+        root.Size = TARGET_HITBOX_SIZE
+    end
+    root.Transparency = showHitbox and 0.85 or 1 
+    root.CanCollide = true
+end
+
+local function restoreOriginalSize(model)
+    local root = getRootPart(model)
+    if root and originalSizes[model] then
+        root.Size = originalSizes[model]
+        root.Transparency = 1
+        root.CanCollide = false
+    end
+    originalSizes[model] = nil
+end
+
+local function addNPC(model)
+    if activeNPCs[model] or not isValidNPC(model) then return end
+    local head = model:FindFirstChild("Head")
+    local root = getRootPart(model)
+    if not (head or root) then return end
+    activeNPCs[model] = { head = head or root, root = root }
+    if wallEnabled then createBoxForPart(head or root) end
+end
+
+-- Weapon Mods
+local function patchWeapons(options)
+    local weaponsFolder = RS:FindFirstChild("Shared")
+        and RS.Shared:FindFirstChild("Configs")
+        and RS.Shared.Configs:FindFirstChild("Weapon")
+        and RS.Shared.Configs.Weapon:FindFirstChild("Weapons_Player")
+    
+    if not weaponsFolder then return end
+
+    for _, platform in pairs(weaponsFolder:GetChildren()) do
+        if platform.Name:match("^Platform_") then
+            for _, weapon in pairs(platform:GetChildren()) do
+                for _, child in pairs(weapon:GetChildren()) do
+                            if child:IsA("ModuleScript") and child.Name:match("^Receiver%.") then
+                                local success, receiver = pcall(require, child)
+                                if success and receiver and receiver.Config and receiver.Config.Tune then
+                                    local tune = receiver.Config.Tune
+                                    if options.recoil then
+                                        tune.Recoil_X = 0 tune.Recoil_Z = 0 tune.RecoilForce_Tap = 0
+                                        tune.RecoilForce_Impulse = 0 tune.Recoil_Range = Vector2.zero
+                                        tune.Recoil_Camera = 0 tune.RecoilAccelDamp_Crouch = Vector3.new(1, 1, 1)
+                                        tune.RecoilAccelDamp_Prone = Vector3.new(1, 1, 1)
+                                    end
+                                    if options.firemodes then tune.Firemodes = {3, 2, 1, 0} end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+--- GUI CREATION ---
+
+local sg = Instance.new("ScreenGui", localPlayer.PlayerGui)
+sg.Name = "Dexter_Premium_V6"
+sg.ResetOnSpawn = false
+sg.DisplayOrder = 9999
+
+-- Nút mở UI nhỏ (Toggle Button)
+local toggleBtn = Instance.new("TextButton", sg)
+toggleBtn.Size = UDim2.new(0, 45, 0, 45)
+toggleBtn.Position = UDim2.new(0, 20, 0.5, -22)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(85, 170, 255)
+toggleBtn.Text = "MENU"
+toggleBtn.Font = "GothamBold"
+toggleBtn.TextSize = 10
+toggleBtn.TextColor3 = Color3.new(0,0,0)
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(1, 0)
+local stroke = Instance.new("UIStroke", toggleBtn)
+stroke.Thickness = 2
+stroke.Color = Color3.new(1,1,1)
+
+-- Main Window Frame
+local main = Instance.new("Frame", sg)
+main.Size = UDim2.new(0, 500, 0, 350)
+main.Position = UDim2.new(0.5, -250, 0.5, -175)
+main.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+main.BorderSizePixel = 0
+main.Visible = guiVisible
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 8)
+
+toggleBtn.MouseButton1Click:Connect(function()
+    guiVisible = not guiVisible
+    main.Visible = guiVisible
 end)
 
-visual:AddToggle("Enable ESP Box", function(v) espEnabled = v end)
-
-local function createESP(m)
-    local box = Instance.new("BoxHandleAdornment")
-    box.Size = Vector3.new(4, 6, 4)
-    box.AlwaysOnTop = true
-    box.ZIndex = 5
-    box.Transparency = 0.5
-    box.Color3 = Color3.new(1, 0, 0)
-    box.Adornee = getTargetPart(m)
-    box.Parent = m
-    
-    RunService.RenderStepped:Connect(function()
-        if m.Parent and espEnabled then
-            box.Visible = true
-        else
-            box.Visible = false
-        end
-    end)
+-- Dragging Logic
+local dragging, dragInput, dragStart, startPos
+local function updateDrag(input)
+    local delta = input.Position - dragStart
+    main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 end
+
+local topBar = Instance.new("Frame", main)
+topBar.Size = UDim2.new(1, 0, 0, 40)
+topBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Instance.new("UICorner", topBar)
+
+topBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = main.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+
+topBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end
+end)
 
 RunService.RenderStepped:Connect(function()
+    if dragging and dragInput then updateDrag(dragInput) end
+end)
+
+-- Title
+local title = Instance.new("TextLabel", topBar)
+title.Size = UDim2.new(1, -20, 1, 0)
+title.Position = UDim2.new(0, 10, 0, 0)
+title.Text = "BRM5 & ZOMBIES v6.6 💀"
+title.Font = "GothamBold"
+title.TextColor3 = Color3.fromRGB(85, 170, 255)
+title.TextSize = 16
+title.TextXAlignment = "Left"
+title.BackgroundTransparency = 1
+
+local sidebar = Instance.new("Frame", main)
+sidebar.Position = UDim2.new(0, 0, 0, 40)
+sidebar.Size = UDim2.new(0, 130, 1, -40)
+sidebar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+local sideLayout = Instance.new("UIListLayout", sidebar)
+sideLayout.HorizontalAlignment = "Center"
+sideLayout.Padding = UDim.new(0, 8)
+
+local container = Instance.new("Frame", main)
+container.Position = UDim2.new(0, 140, 0, 50)
+container.Size = UDim2.new(1, -150, 1, -60)
+container.BackgroundTransparency = 1
+
+local function createTab()
+    local f = Instance.new("ScrollingFrame", container)
+    f.Size = UDim2.new(1, 0, 1, 0)
+    f.BackgroundTransparency = 1
+    f.Visible = false
+    f.ScrollBarThickness = 2
+    f.AutomaticCanvasSize = "Y"
+    Instance.new("UIListLayout", f).Padding = UDim.new(0, 12)
+    return f
+end
+
+local tabCombat = createTab()
+local tabVisuals = createTab()
+local tabWeapons = createTab()
+local tabColors = createTab()
+local tabCredits = createTab()
+tabCombat.Visible = true
+
+local tabButtons = {}
+local function addTabBtn(name, target)
+    local b = Instance.new("TextButton", sidebar)
+    b.Size = UDim2.new(1, -20, 0, 35)
+    b.BackgroundColor3 = (name == "Combat") and Color3.fromRGB(85, 170, 255) or Color3.fromRGB(30, 30, 30)
+    b.Text = name
+    b.TextColor3 = (name == "Combat") and Color3.new(0,0,0) or Color3.new(0.8,0.8,0.8)
+    b.Font = "GothamMedium"
+    Instance.new("UICorner", b)
+    tabButtons[name] = b
+    b.MouseButton1Click:Connect(function()
+        for n, btn in pairs(tabButtons) do btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30) btn.TextColor3 = Color3.new(0.8,0.8,0.8) end
+        b.BackgroundColor3 = Color3.fromRGB(85, 170, 255) b.TextColor3 = Color3.new(0,0,0)
+        tabCombat.Visible = false tabVisuals.Visible = false tabWeapons.Visible = false tabColors.Visible = false tabCredits.Visible = false
+        target.Visible = true
+    end)
+end
+
+addTabBtn("Combat", tabCombat)
+addTabBtn("Visuals", tabVisuals)
+addTabBtn("Weapons", tabWeapons)
+addTabBtn("Colors", tabColors)
+addTabBtn("Credits", tabCredits)
+
+local function createButton(parent, text, cb)
+    local btn = Instance.new("TextButton", parent)
+    btn.Size = UDim2.new(1, -10, 0, 35)
+    btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    btn.Text = text
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = "Gotham"
+    Instance.new("UICorner", btn)
+    local act = false
+    btn.MouseButton1Click:Connect(function()
+        act = not act
+        btn.BackgroundColor3 = act and Color3.fromRGB(85, 170, 255) or Color3.fromRGB(35, 35, 35)
+        btn.TextColor3 = act and Color3.new(0, 0, 0) or Color3.new(1, 1, 1)
+        cb(act)
+    end)
+end
+
+-- TABS CONTENT
+createButton(tabCombat, "Silent Hitbox (All NPCs)", function(v) silentEnabled = v end)
+createButton(tabCombat, "Show Hitbox", function(v) showHitbox = v end)
+
+createButton(tabVisuals, "ESP Wall (All NPCs)", function(v)
+    wallEnabled = v
+    if wallEnabled then for _, d in pairs(activeNPCs) do createBoxForPart(d.head) end else destroyAllBoxes() end
+end)
+createButton(tabVisuals, "FullBright", function(v)
+    fullBrightEnabled = v
+    if not v then for p, val in pairs(originalLighting) do lighting[p] = val end end
+end)
+
+createButton(tabWeapons, "Anti-Recoil", function(v) patchOptions.recoil = v patchWeapons(patchOptions) end)
+createButton(tabWeapons, "Unlock Firemodes", function(v) patchOptions.firemodes = v patchWeapons(patchOptions) end)
+
+-- CREDITS
+local cr = Instance.new("TextLabel", tabCredits)
+cr.Size = UDim2.new(1,0,0,100)
+cr.Text = "Updated for Zombies support\nModified by Dexter\nPress INSERT or Click MENU"
+cr.TextColor3 = Color3.new(1,1,1)
+cr.BackgroundTransparency = 1
+
+-- UNLOAD
+local unl = Instance.new("TextButton", sidebar)
+unl.Size = UDim2.new(0, 110, 0, 35)
+unl.Text = "Unload Script"
+unl.BackgroundColor3 = Color3.fromRGB(120, 40, 40)
+unl.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", unl)
+unl.MouseButton1Click:Connect(function()
+    isUnloaded = true
+    destroyAllBoxes()
+    for m, _ in pairs(activeNPCs) do restoreOriginalSize(m) end
+    for _, c in ipairs(wallConnections) do pcall(function() c:Disconnect() end) end
+    sg:Destroy()
+end)
+
+--- MAIN LOOPS ---
+
+for _, m in ipairs(Workspace:GetChildren()) do
+    if m:IsA("Model") and isValidNPC(m) then addNPC(m) end
+end
+
+table.insert(wallConnections, Workspace.ChildAdded:Connect(function(m)
+    if m:IsA("Model") then 
+        task.delay(0.5, function() if isValidNPC(m) then addNPC(m) end end) 
+    end
+end))
+
+RunService.RenderStepped:Connect(function()
+    if isUnloaded then return end
+
+    if fullBrightEnabled then
+        lighting.Brightness = 2
+        lighting.ClockTime = 12
+        lighting.GlobalShadows = false
+        lighting.Ambient = Color3.new(1, 1, 1)
+    end
+
     for m, d in pairs(activeNPCs) do
         if not m.Parent then activeNPCs[m] = nil continue end
-        local p = d.target
-        if silentEnabled then
-            if not originalSizes[p] then originalSizes[p] = p.Size end
-            p.Size = TARGET_HITBOX_SIZE
-            p.Transparency = showHitbox and 0.8 or 1
-        else
-            if originalSizes[p] then
-                p.Size = originalSizes[p]
-                p.Transparency = 0
-                originalSizes[p] = nil
-            end
+        
+        if wallEnabled and d.head and d.head:FindFirstChild("Wall_Box") then
+            local origin = camera.CFrame.Position
+            local rp = RaycastParams.new()
+            rp.FilterType = Enum.RaycastFilterType.Blacklist
+            rp.FilterDescendantsInstances = {localPlayer.Character, m}
+            local r = Workspace:Raycast(origin, d.head.Position - origin, rp)
+            d.head.Wall_Box.Color3 = (not r) and visibleColor or hiddenColor
         end
+
+        if silentEnabled then applySilentHitbox(m, d.root) end
     end
 end)
 
-local function setup(m)
-    if isValidNPC(m) then
-        activeNPCs[m] = {target = getTargetPart(m)}
-        createESP(m)
+UserInputService.InputBegan:Connect(function(i, gp)
+    if not gp and i.KeyCode == Enum.KeyCode.Insert then
+        guiVisible = not guiVisible
+        main.Visible = guiVisible
     end
-end
-
-for _, m in ipairs(Workspace:GetChildren()) do if m:IsA("Model") then setup(m) end end
-Workspace.ChildAdded:Connect(function(m) if m:IsA("Model") then task.delay(0.5, function() setup(m) end) end end)
+end)

@@ -33,8 +33,8 @@ local isUnloaded = false
 local patchOptions = { recoil = false, firemodes = false }
 
 -- COLORS
-local visibleR, visibleG, visibleB = 255, 0, 0    
-local hiddenR, hiddenG, hiddenB = 255, 0, 0       
+local visibleR, visibleG, visibleB = 0, 255, 0    
+local hiddenR, hiddenG, hiddenB = 0, 255, 0       
 local visibleColor = Color3.fromRGB(visibleR, visibleG, visibleB)
 local hiddenColor = Color3.fromRGB(hiddenR, hiddenG, hiddenB)
 
@@ -151,7 +151,7 @@ end
 --- GUI CREATION ---
 
 local sg = Instance.new("ScreenGui", localPlayer.PlayerGui)
-sg.Name = "Dexter_Premium_V6"
+sg.Name = "tokai_Premium_V6"
 sg.ResetOnSpawn = false
 sg.DisplayOrder = 9999
 
@@ -218,7 +218,7 @@ end)
 local title = Instance.new("TextLabel", topBar)
 title.Size = UDim2.new(1, -20, 1, 0)
 title.Position = UDim2.new(0, 10, 0, 0)
-title.Text = "BRM5 & ZOMBIES v6.6 💀"
+title.Text = "BRM5 tokaihub"
 title.Font = "GothamBold"
 title.TextColor3 = Color3.fromRGB(85, 170, 255)
 title.TextSize = 16
@@ -316,7 +316,7 @@ createButton(tabWeapons, "Unlock Firemodes", function(v) patchOptions.firemodes 
 -- CREDITS
 local cr = Instance.new("TextLabel", tabCredits)
 cr.Size = UDim2.new(1,0,0,100)
-cr.Text = "Updated for Zombies support\nModified by Dexter\nPress INSERT or Click MENU"
+cr.Text = "tokai"
 cr.TextColor3 = Color3.new(1,1,1)
 cr.BackgroundTransparency = 1
 

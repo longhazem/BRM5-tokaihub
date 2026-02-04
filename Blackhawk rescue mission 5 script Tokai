@@ -1,5 +1,5 @@
 -- Clears the console output before starting the script
-print("Starting script with Zombie support...")
+print("Starting script with Fast Scan & Zombie Colors...")
 if typeof(clear) == "function" then clear() end
 
 -- SERVICES
@@ -29,6 +29,7 @@ local showHitbox = false
 local fullBrightEnabled = false 
 local guiVisible = true         
 local isUnloaded = false        
+local fastScanEnabled = false   -- Biến mới cho tính năng quét nhanh
 
 local patchOptions = { recoil = false, firemodes = false }
 
@@ -52,12 +53,10 @@ local function getRootPart(model)
     return model:FindFirstChild("Root") or model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("UpperTorso")
 end
 
--- Cập nhật hàm kiểm tra NPC: Chấp nhận Male (AI), Zombie hoặc Zombies
 local function isValidNPC(model)
     local name = model.Name:lower()
     local isTargetName = (name == "male" or name == "zombie" or name == "zombies")
     
-    -- Nếu là Male thì check thêm AI child đặc thù của BRM5
     if name == "male" then
         local hasAI = false
         for _, c in ipairs(model:GetChildren()) do
@@ -151,7 +150,7 @@ end
 --- GUI CREATION ---
 
 local sg = Instance.new("ScreenGui", localPlayer.PlayerGui)
-sg.Name = "tokai_Premium_V6"
+sg.Name = "tokai_Premium_V6_Scan"
 sg.ResetOnSpawn = false
 sg.DisplayOrder = 9999
 
@@ -305,6 +304,17 @@ createButton(tabVisuals, "ESP Wall (All NPCs)", function(v)
     wallEnabled = v
     if wallEnabled then for _, d in pairs(activeNPCs) do createBoxForPart(d.head) end else destroyAllBoxes() end
 end)
+-- BUTTON MỚI: AUTO FAST SCAN
+createButton(tabVisuals, "Auto Fast Scan (Update)", function(v)
+    fastScanEnabled = v
+    -- Quét ngay lập tức khi bật
+    if v then
+        for _, m in ipairs(Workspace:GetChildren()) do
+            if m:IsA("Model") and not activeNPCs[m] and isValidNPC(m) then addNPC(m) end
+        end
+    end
+end)
+
 createButton(tabVisuals, "FullBright", function(v)
     fullBrightEnabled = v
     if not v then for p, val in pairs(originalLighting) do lighting[p] = val end end
@@ -337,15 +347,34 @@ end)
 
 --- MAIN LOOPS ---
 
+-- Initial Scan
 for _, m in ipairs(Workspace:GetChildren()) do
     if m:IsA("Model") and isValidNPC(m) then addNPC(m) end
 end
 
+-- Standard ChildAdded (Backup)
 table.insert(wallConnections, Workspace.ChildAdded:Connect(function(m)
     if m:IsA("Model") then 
         task.delay(0.5, function() if isValidNPC(m) then addNPC(m) end end) 
     end
 end))
+
+-- FAST SCAN LOOP (Quét mỗi 0.5s để cập nhật nhanh hơn)
+task.spawn(function()
+    while not isUnloaded do
+        if fastScanEnabled then
+            for _, m in ipairs(Workspace:GetChildren()) do
+                -- Chỉ check nếu chưa có trong danh sách activeNPCs
+                if m:IsA("Model") and not activeNPCs[m] then
+                    if isValidNPC(m) then
+                        addNPC(m)
+                    end
+                end
+            end
+        end
+        task.wait(0.5) -- Chu kỳ quét nhanh
+    end
+end)
 
 RunService.RenderStepped:Connect(function()
     if isUnloaded then return end
@@ -366,7 +395,13 @@ RunService.RenderStepped:Connect(function()
             rp.FilterType = Enum.RaycastFilterType.Blacklist
             rp.FilterDescendantsInstances = {localPlayer.Character, m}
             local r = Workspace:Raycast(origin, d.head.Position - origin, rp)
-            d.head.Wall_Box.Color3 = (not r) and visibleColor or hiddenColor
+            
+            -- COLOR LOGIC: Zombie -> Red, Male -> Green
+            if m.Name == "Zombie" or m.Name == "zombies" then
+                d.head.Wall_Box.Color3 = Color3.fromRGB(255, 0, 0)
+            else
+                d.head.Wall_Box.Color3 = Color3.fromRGB(0, 255, 0)
+            end
         end
 
         if silentEnabled then applySilentHitbox(m, d.root) end

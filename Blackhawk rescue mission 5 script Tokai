@@ -33,7 +33,7 @@ local isUnloaded = false
 local patchOptions = { recoil = false, firemodes = false }
 
 -- COLORS
-local visibleR, visibleG, visibleB = 0, 255, 0    
+local visibleR, visibleG, visibleB = 255, 0, 0    
 local hiddenR, hiddenG, hiddenB = 255, 0, 0       
 local visibleColor = Color3.fromRGB(visibleR, visibleG, visibleB)
 local hiddenColor = Color3.fromRGB(hiddenR, hiddenG, hiddenB)

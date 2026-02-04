@@ -33,7 +33,7 @@ local isUnloaded = false
 local patchOptions = { recoil = false, firemodes = false }
 
 -- COLORS
-local visibleR, visibleG, visibleB = 255, 0, 0    
+local visibleR, visibleG, visibleB = 0, 255, 0    
 local hiddenR, hiddenG, hiddenB = 255, 0, 0       
 local visibleColor = Color3.fromRGB(visibleR, visibleG, visibleB)
 local hiddenColor = Color3.fromRGB(hiddenR, hiddenG, hiddenB)
@@ -92,12 +92,7 @@ end
 
 local function applySilentHitbox(model, root)
     if not originalSizes[model] then originalSizes[model] = root.Size end
-    local head = model:FindFirstChild("Head")
-    if head then
-        root.Size = head.Size  -- Thay đổi kích thước hitbox thành kích thước của đầu NPC
-    else
-        root.Size = TARGET_HITBOX_SIZE
-    end
+    root.Size = TARGET_HITBOX_SIZE
     root.Transparency = showHitbox and 0.85 or 1 
     root.CanCollide = true
 end
@@ -134,19 +129,17 @@ local function patchWeapons(options)
         if platform.Name:match("^Platform_") then
             for _, weapon in pairs(platform:GetChildren()) do
                 for _, child in pairs(weapon:GetChildren()) do
-                            if child:IsA("ModuleScript") and child.Name:match("^Receiver%.") then
-                                local success, receiver = pcall(require, child)
-                                if success and receiver and receiver.Config and receiver.Config.Tune then
-                                    local tune = receiver.Config.Tune
-                                    if options.recoil then
-                                        tune.Recoil_X = 0 tune.Recoil_Z = 0 tune.RecoilForce_Tap = 0
-                                        tune.RecoilForce_Impulse = 0 tune.Recoil_Range = Vector2.zero
-                                        tune.Recoil_Camera = 0 tune.RecoilAccelDamp_Crouch = Vector3.new(1, 1, 1)
-                                        tune.RecoilAccelDamp_Prone = Vector3.new(1, 1, 1)
-                                    end
-                                    if options.firemodes then tune.Firemodes = {3, 2, 1, 0} end
-                                end
+                    if child:IsA("ModuleScript") and child.Name:match("^Receiver%.") then
+                        local success, receiver = pcall(require, child)
+                        if success and receiver and receiver.Config and receiver.Config.Tune then
+                            local tune = receiver.Config.Tune
+                            if options.recoil then
+                                tune.Recoil_X = 0 tune.Recoil_Z = 0 tune.RecoilForce_Tap = 0
+                                tune.RecoilForce_Impulse = 0 tune.Recoil_Range = Vector2.zero
+                                tune.Recoil_Camera = 0 tune.RecoilAccelDamp_Crouch = Vector3.new(1, 1, 1)
+                                tune.RecoilAccelDamp_Prone = Vector3.new(1, 1, 1)
                             end
+                            if options.firemodes then tune.Firemodes = {3, 2, 1, 0} end
                         end
                     end
                 end

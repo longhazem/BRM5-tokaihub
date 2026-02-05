@@ -1,175 +1,175 @@
--- BRM5 v6.5 by Dexter (UI Fixed Version)
+-- BRM5 v6.5 by Dexter (ESP Auto-Update Version)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
--- --- CONFIG & STATE ---
+-- --- CẤU HÌNH ---
 local espEnabled = false
 local noRecoilEnabled = false
-local TARGET_NAME = "Male"
 local TARGET_PART = "Head"
-local trackedParts = {}
+local trackedParts = {} -- Lưu trữ để quản lý xóa/hiện
 
--- --- LOGIC ESP (WALL) ---
+-- --- LOGIC ESP (TỰ ĐỘNG CẬP NHẬT) ---
+
 local function createBoxForPart(part)
     if not part or not part.Parent or part:FindFirstChild("Wall_Box") then return end
+    
+    -- Không ESP chính mình
+    local model = part.Parent
+    if model == LocalPlayer.Character then return end
+
     local box = Instance.new("BoxHandleAdornment")
     box.Name = "Wall_Box"
-    box.Size = part.Size + Vector3.new(0.1, 0.1, 0.1)
+    box.Size = part.Size + Vector3.new(0.2, 0.2, 0.2)
     box.Adornee = part
     box.AlwaysOnTop = true
     box.ZIndex = 10
-    box.Color3 = Color3.fromRGB(255, 0, 0)
-    box.Transparency = espEnabled and 0.3 or 1
+    box.Color3 = Color3.fromRGB(255, 0, 0) -- Màu đỏ cho địch
+    box.Transparency = espEnabled and 0.4 or 1
     box.Parent = part
-    trackedParts[part] = true
+    
+    trackedParts[part] = box
 end
 
-local function updateESP(state)
-    espEnabled = state
-    for part, _ in pairs(trackedParts) do
-        if part and part:FindFirstChild("Wall_Box") then
-            part.Wall_Box.Transparency = state and 0.3 or 1
-        end
-    end
-    if state then
-        for _, v in ipairs(Workspace:GetDescendants()) do
-            if v:IsA("Model") and v.Name == TARGET_NAME then
-                local head = v:FindFirstChild(TARGET_PART)
-                if head then createBoxForPart(head) end
+-- Vòng lặp quét liên tục (Xử lý việc đổi round/hồi sinh)
+task.spawn(function()
+    while true do
+        if espEnabled then
+            for _, v in ipairs(Workspace:GetDescendants()) do
+                -- Tìm các Model có Humanoid (Địch hoặc NPC)
+                if v:IsA("Humanoid") then
+                    local char = v.Parent
+                    local head = char:FindFirstChild(TARGET_PART)
+                    if head and head:IsA("BasePart") then
+                        createBoxForPart(head)
+                    end
+                end
             end
         end
+        task.wait(2) -- Quét lại mỗi 2 giây để tránh giật lag và cập nhật round mới
+    end
+end)
+
+local function toggleESP(state)
+    espEnabled = state
+    for part, box in pairs(trackedParts) do
+        if box and box.Parent then
+            box.Transparency = state and 0.4 or 1
+        else
+            trackedParts[part] = nil -- Dọn dẹp rác nếu part đã biến mất
+        end
     end
 end
 
--- --- LOGIC NO RECOIL ---
-local function updateRecoil(state)
+-- --- LOGIC NO RECOIL (GIỮ NGUYÊN LỆNH GỐC) ---
+local function toggleRecoil(state)
     noRecoilEnabled = state
     if state then
-        pcall(function()
-            local weapons = game:GetService("ReplicatedStorage").Shared.Configs.Weapon.Weapons_Player
-            for _, platform in pairs(weapons:GetChildren()) do
-                if platform.Name:match("^Platform_") then
-                    for _, wp in pairs(platform:GetChildren()) do
-                        for _, child in pairs(wp:GetChildren()) do
-                            if child:IsA("ModuleScript") and child.Name:match("^Receiver") then
-                                local tune = require(child).Config.Tune
-                                tune.Recoil_X = 0
-                                tune.Recoil_Z = 0
-                                tune.RecoilForce_Tap = 0
-                                tune.RecoilForce_Impulse = 0
-                                tune.Recoil_Camera = 0
+        task.spawn(function()
+            pcall(function()
+                local shared = game:GetService("ReplicatedStorage"):FindFirstChild("Shared")
+                local configs = shared and shared:FindFirstChild("Configs")
+                local weapon = configs and configs:FindFirstChild("Weapon")
+                local weaponsPlayer = weapon and weapon:FindFirstChild("Weapons_Player")
+
+                if weaponsPlayer then
+                    for _, platform in pairs(weaponsPlayer:GetChildren()) do
+                        if platform.Name:match("^Platform_") then
+                            for _, wp in pairs(platform:GetChildren()) do
+                                for _, child in pairs(wp:GetChildren()) do
+                                    if child:IsA("ModuleScript") and child.Name:match("^Receiver") then
+                                        local success, receiver = pcall(require, child)
+                                        if success and receiver.Config and receiver.Config.Tune then
+                                            local tune = receiver.Config.Tune
+                                            tune.Recoil_X = 0
+                                            tune.Recoil_Z = 0
+                                            tune.RecoilForce_Tap = 0
+                                            tune.RecoilForce_Impulse = 0
+                                            tune.Recoil_Camera = 0
+                                        end
+                                    end
+                                end
                             end
                         end
                     end
                 end
-            end
+            end)
         end)
     end
 end
 
--- --- UI CREATION ---
+-- --- GIAO DIỆN UI (FIXED VISIBILITY) ---
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "Dexter_UI_v3"
+ScreenGui.Name = "Dexter_V4"
 ScreenGui.ResetOnSpawn = false
+ScreenGui.DisplayOrder = 999
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local Main = Instance.new("Frame")
-Main.Name = "Main"
-Main.Size = UDim2.new(0, 220, 0, 160)
-Main.Position = UDim2.new(0.5, -110, 0.5, -80)
-Main.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Main.Size = UDim2.new(0, 200, 0, 150)
+Main.Position = UDim2.new(0.5, -100, 0.5, -75)
+Main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 Main.BorderSizePixel = 0
 Main.Parent = ScreenGui
 
--- UI Design Elements
-local Corner = Instance.new("UICorner", Main)
-Corner.CornerRadius = UDim.new(0, 10)
-
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 8)
 local Stroke = Instance.new("UIStroke", Main)
-Stroke.Color = Color3.fromRGB(0, 255, 127)
-Stroke.Thickness = 1.5
+Stroke.Color = Color3.fromRGB(0, 255, 150)
+Stroke.Thickness = 2
 
-local Header = Instance.new("Frame", Main)
-Header.Size = UDim2.new(1, 0, 0, 35)
-Header.BackgroundTransparency = 1
-
-local Title = Instance.new("TextLabel", Header)
-Title.Size = UDim2.new(1, 0, 1, 0)
-Title.Text = "BRM5 CONTROL"
+local Title = Instance.new("TextLabel", Main)
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Text = "BRM5 CONTROL V4"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 14
 Title.BackgroundTransparency = 1
 
--- Button Builder
-local function CreateButton(text, yPos, callback)
+local function CreateButton(name, yPos, callback)
     local Btn = Instance.new("TextButton", Main)
-    Btn.Size = UDim2.new(0.85, 0, 0, 35)
-    Btn.Position = UDim2.new(0.075, 0, 0, yPos)
-    Btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-    Btn.Text = text .. ": OFF"
+    Btn.Size = UDim2.new(0.8, 0, 0, 35)
+    Btn.Position = UDim2.new(0.1, 0, 0, yPos)
+    Btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    Btn.Text = name .. ": OFF"
     Btn.TextColor3 = Color3.fromRGB(200, 200, 200)
     Btn.Font = Enum.Font.GothamSemibold
-    Btn.TextSize = 13
-    Btn.BorderSizePixel = 0
-    
-    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
+    Btn.TextSize = 12
+    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 4)
 
     local active = false
     Btn.MouseButton1Click:Connect(function()
         active = not active
-        Btn.Text = text .. ": " .. (active and "ON" or "OFF")
-        Btn.BackgroundColor3 = active and Color3.fromRGB(0, 150, 80) or Color3.fromRGB(45, 45, 45)
-        Btn.TextColor3 = active and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
+        Btn.Text = name .. ": " .. (active and "ON" or "OFF")
+        Btn.BackgroundColor3 = active and Color3.fromRGB(0, 150, 80) or Color3.fromRGB(40, 40, 40)
         callback(active)
     end)
 end
 
-CreateButton("ESP Wall", 50, updateESP)
-CreateButton("No Recoil", 100, updateRecoil)
+CreateButton("ESP Enemies", 50, toggleESP)
+CreateButton("No Recoil", 95, toggleRecoil)
 
--- --- DRAG SYSTEM (CUSTOM) ---
-local dragging, dragInput, dragStart, startPos
-
-local function update(input)
-    local delta = input.Position - dragStart
-    Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-end
-
+-- Hệ thống kéo thả
+local dragStart, startPos, dragging
 Main.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragging = true
         dragStart = input.Position
         startPos = Main.Position
-
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
     end
 end)
-
-Main.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
-    end
-end)
-
 UserInputService.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        update(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 end)
-
--- Toggle Visible with Insert
-UserInputService.InputBegan:Connect(function(input, processed)
-    if not processed and input.KeyCode == Enum.KeyCode.Insert then
-        Main.Visible = not Main.Visible
-    end
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
 end)
 
-print("Script Loaded - Bấm Insert để ẩn hiện")
+-- Phím tắt Insert
+UserInputService.InputBegan:Connect(function(input, proc)
+    if not proc and input.KeyCode == Enum.KeyCode.Insert then Main.Visible = not Main.Visible end
+end)

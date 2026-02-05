@@ -1,7 +1,7 @@
 --[[ 
-    DEXTER BRM5 - PHIÊN BẢN FIX HIỂN THỊ
-    - Đã thêm nút bấm "D" để mở Menu trên mọi thiết bị.
-    - Giữ nguyên toàn bộ tính năng Aim/Wall/No Recoil của bạn.
+    WRAPPER CHO DEXTER BRM5 v6.5
+    - Công dụng: Thêm nút mini "D" để đóng/mở menu chính.
+    - Cách dùng: Copy toàn bộ mã này và dán vào Executor.
 ]]
 
 local UserInputService = game:GetService("UserInputService")
@@ -9,130 +9,187 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- 1. XÓA GUI CŨ NẾU CÓ
-if PlayerGui:FindFirstChild("Dexter_Fixed_UI") then
-    PlayerGui:FindFirstChild("Dexter_Fixed_UI"):Destroy()
-end
+-- 1. TẠO NÚT BẤM MINI (D) ĐỂ ĐIỀU KHIỂN
+local LoaderGui = Instance.new("ScreenGui")
+LoaderGui.Name = "Dexter_MiniButton_Wrapper"
+LoaderGui.Parent = PlayerGui
+LoaderGui.ResetOnSpawn = false
 
--- 2. TẠO GUI MỚI
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "Dexter_Fixed_UI"
-ScreenGui.Parent = PlayerGui
-ScreenGui.ResetOnSpawn = false
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
--- 3. NÚT MINI DRAGGABLE (Chữ D)
-local MiniButton = Instance.new("Frame")
-local UICorner = Instance.new("UICorner")
-local ButtonLabel = Instance.new("TextLabel")
-local ClickBtn = Instance.new("TextButton")
-
-MiniButton.Name = "MiniButton"
-MiniButton.Parent = ScreenGui
-MiniButton.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
+local MiniButton = Instance.new("Frame", LoaderGui)
+MiniButton.Size = UDim2.new(0, 45, 0, 45)
 MiniButton.Position = UDim2.new(0, 20, 0, 150)
-MiniButton.Size = UDim2.new(0, 50, 0, 50)
+MiniButton.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
 MiniButton.Active = true
-MiniButton.Draggable = true -- Hỗ trợ kéo thả cơ bản
+MiniButton.Draggable = true
+Instance.new("UICorner", MiniButton).CornerRadius = UDim.new(1, 0)
 
-UICorner.CornerRadius = UDim.new(1, 0)
-UICorner.Parent = MiniButton
-
-ButtonLabel.Parent = MiniButton
-ButtonLabel.BackgroundTransparency = 1
+local ButtonLabel = Instance.new("TextLabel", MiniButton)
 ButtonLabel.Size = UDim2.new(1, 0, 1, 0)
-ButtonLabel.Font = Enum.Font.GothamBold
 ButtonLabel.Text = "D"
 ButtonLabel.TextColor3 = Color3.new(1, 1, 1)
-ButtonLabel.TextSize = 25
+ButtonLabel.BackgroundTransparency = 1
+ButtonLabel.Font = Enum.Font.GothamBold
+ButtonLabel.TextSize = 20
 
-ClickBtn.Parent = MiniButton
-ClickBtn.BackgroundTransparency = 1
+local ClickBtn = Instance.new("TextButton", MiniButton)
 ClickBtn.Size = UDim2.new(1, 0, 1, 0)
+ClickBtn.BackgroundTransparency = 1
 ClickBtn.Text = ""
 
--- 4. KHUNG MENU CHÍNH (Gộp từ mã của bạn)
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Parent = ScreenGui
-MainFrame.Size = UDim2.new(0, 260, 0, 420)
-MainFrame.Position = UDim2.new(0.5, -130, 0.5, -210)
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-MainFrame.Visible = true -- Hiện menu ngay khi chạy
-MainFrame.Active = true
-MainFrame.Draggable = true
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
-
--- Nút bấm Mini để ẩn/hiện
-ClickBtn.MouseButton1Click:Connect(function()
-    MainFrame.Visible = not MainFrame.Visible
-end)
-
--- 5. CHÈN TOÀN BỘ LOGIC CỦA BẠN VÀO ĐÂY
+-- 2. CHÈN NGUYÊN VĂN MÃ CỦA BẠN VÀO ĐÂY
 task.spawn(function()
+    -- [BẮT ĐẦU MÃ GỐC]
+    -- BRM5 v6.5 by dexter 
+    -- Credits to ryknuq and their overvoltage script, which helped me understand how to integrate the Aim into my script. Without their script, I don't think I could have done this.
+
+    -- Obtaining essential Roblox services
+    local Players = game:GetService("Players")
     local RunService = game:GetService("RunService")
+    local UserInputService = game:GetService("UserInputService")
+    local HttpService = game:GetService("HttpService")
     local Workspace = game:GetService("Workspace")
-    
-    -- Các biến cấu hình từ mã gốc
-    local wallEnabled = false
-    local aimEnabled = false
-    local fovEnabled = false
-    local fovRadius = 100
-    local smoothing = 95
-    
-    -- Hàm hỗ trợ tạo nút trong Menu
-    local function createMenuButton(text, yPos, color)
-        local btn = Instance.new("TextButton", MainFrame)
-        btn.Size = UDim2.new(0.9, 0, 0, 35)
-        btn.Position = UDim2.new(0.05, 0, 0, yPos)
-        btn.BackgroundColor3 = color
-        btn.Text = text
-        btn.TextColor3 = Color3.new(1, 1, 1)
-        btn.Font = Enum.Font.GothamBold
-        btn.TextSize = 14
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-        return btn
+    local Camera = Workspace.CurrentCamera
+
+    -- Local variables for player and configuration
+    local LocalPlayer = Players.LocalPlayer -- Reference to the local player
+    local configFile = "Dexter_Config.txt" -- Configuration file name
+
+    -- Constants for target detection
+    local TARGET_NAME = "Male" -- Name of the target NPC model
+    local TARGET_PART = "Head" -- NPC body part to aim at
+    local REQUIRED_CHILD = "Wall_Box" -- Name of the required child object to identify valid targets for the Aim
+    local DEADZONE = 1.5 -- Deadzone for the Aim, to avoid jerky movements with small deltas
+
+    -- Tables and state variables
+    local trackedParts = {} -- Stores NPC parts that are being tracked (for Wall)
+    local wallConnections = {} -- Stores event connections for Wall
+    local wallEnabled = false -- Wall state (on/off)
+    local guiVisible = true -- GUI visibility state
+    local isUnloaded = false -- Indicates if the script has been unloaded/disabled
+
+    -- configuration variables
+    local aimEnabled = false -- Aim state (on/off)
+    local smoothing = 95 -- Aim smoothing level (0-100, higher = smoother)
+    local holdingRightClick = false -- Indicates if the player is holding down the right mouse button
+    local fovEnabled = false -- FOV (field of view) circle state (on/off)
+    local fovRadius = 100 -- FOV circle radius in pixels
+
+    -- Creation of the FOV circle (initially invisible)
+    local fovCircle = Drawing.new("Circle")
+    fovCircle.Color = Color3.fromRGB(0, 255, 0) -- Green color
+    fovCircle.Thickness = 2 -- Line thickness
+    fovCircle.Filled = false -- Do not fill the circle
+    fovCircle.Visible = false -- Initially invisible
+
+    -- Function to save the current configuration to a file
+    local function saveConfig(config)
+        if writefile then -- Checks if the 'writefile' function is available (exploit environments)
+            writefile(configFile, HttpService:JSONEncode({ -- Encodes the configuration table to JSON and writes it
+                wall = config.wall,
+                aim = config.aim,
+                fovEnabled = config.fovEnabled,
+                fovRadius = config.fovRadius,
+                smoothing = config.smoothing
+            }))
+        end
     end
 
-    -- Title
-    local title = Instance.new("TextLabel", MainFrame)
-    title.Size = UDim2.new(1, 0, 0, 40)
-    title.Text = "🎯 BRM5 v4 - by Dexter"
-    title.TextColor3 = Color3.new(1, 1, 1)
-    title.Font = Enum.Font.GothamBold
-    title.BackgroundTransparency = 1
-    title.TextSize = 18
-
-    -- Các nút chức năng
-    local wallBtn = createMenuButton("Wall: OFF", 50, Color3.fromRGB(60, 60, 60))
-    local aimBtn = createMenuButton("Aim: OFF", 95, Color3.fromRGB(60, 60, 60))
-    local fovBtn = createMenuButton("FOV: OFF", 140, Color3.fromRGB(60, 60, 60))
-    local recoilBtn = createMenuButton("No Recoil: OFF", 185, Color3.fromRGB(60, 60, 60))
-    local unloadBtn = createMenuButton("Unload Script", 370, Color3.fromRGB(150, 0, 0))
-
-    -- Logic Wall/Aim cơ bản (Rút gọn để tránh lỗi hiển thị nhưng vẫn giữ chức năng)
-    wallBtn.MouseButton1Click:Connect(function()
-        wallEnabled = not wallEnabled
-        wallBtn.Text = "Wall: " .. (wallEnabled and "ON" or "OFF")
-        wallBtn.BackgroundColor3 = wallEnabled and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(60, 60, 60)
-    end)
-
-    aimBtn.MouseButton1Click:Connect(function()
-        aimEnabled = not aimEnabled
-        aimBtn.Text = "Aim: " .. (aimEnabled and "ON" or "OFF")
-        aimBtn.BackgroundColor3 = aimEnabled and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(60, 60, 60)
-    end)
-
-    unloadBtn.MouseButton1Click:Connect(function()
-        ScreenGui:Destroy()
-    end)
-
-    -- Phím Insert dự phòng
-    UserInputService.InputBegan:Connect(function(input, proc)
-        if not proc and input.KeyCode == Enum.KeyCode.Insert then
-            MainFrame.Visible = not MainFrame.Visible
+    -- Function to load the configuration from a file
+    local function loadConfig()
+        if isfile and isfile(configFile) and readfile then -- Checks if 'isfile' and 'readfile' functions are available and if the file exists
+            local success, data = pcall(function() -- Safely tries to decode the JSON file
+                return HttpService:JSONDecode(readfile(configFile))
+            end)
+            if success then -- If decoding was successful
+                return { -- Returns the loaded configuration, with default values if any are missing
+                    wall = data.wall or false,
+                    aim = data.aim or false,
+                    fovEnabled = data.fovEnabled or false,
+                    fovRadius = data.fovRadius or 100,
+                    smoothing = data.smoothing or 95
+                }
+            end
         end
-    end)
+        -- Returns the default configuration if the file could not be loaded
+        return {
+            wall = false,
+            aim = false,
+            fovEnabled = false,
+            fovRadius = 100,
+            smoothing = 95
+        }
+    end
 
-    print("Dexter Fix Loaded! Use the 'D' button to toggle menu.")
+    -- Loads the configuration when the script starts
+    local currentConfig = loadConfig() -- Renamed 'config' to 'currentConfig' to avoid conflict with the function parameter name
+    wallEnabled = currentConfig.wall
+    aimEnabled = currentConfig.aim
+    fovEnabled = currentConfig.fovEnabled
+    fovRadius = currentConfig.fovRadius
+    smoothing = currentConfig.smoothing
+
+    -- Function to destroy all Wall boxes
+    local function destroyAllBoxes()
+        for part, _ in pairs(trackedParts) do
+            if part and part.Parent and part:FindFirstChild("Wall_Box") then
+                part.Wall_Box:Destroy() -- Destroys the box instance
+            end
+        end
+        trackedParts = {} -- Empties the tracked parts table
+    end
+
+    local function createBoxForPart(part)
+        if isUnloaded or not part or part.Parent == nil or part:FindFirstChild("Wall_Box") then return end -- Conditions for not creating the box
+        task.wait(0.5) -- Short wait to ensure the part is fully loaded
+        if not part or not part.Parent or part:FindFirstChild("Wall_Box") then return end -- Double check
+
+        local box = Instance.new("BoxHandleAdornment") -- Creates the visual object for the Wall
+        box.Name = "Wall_Box" -- Object name
+        box.Size = part.Size + Vector3.new(0.1, 0.1, 0.1) -- Size slightly larger than the part
+        box.Adornee = part -- Associates the box with the NPC part
+        box.AlwaysOnTop = true -- Always visible through other objects
+        box.ZIndex = 5 -- Rendering order
+        box.Color3 = Color3.fromRGB(255, 0, 0) -- Initial color (red by default, will change if visible)
+        box.Transparency = 0.3 -- Box transparency
+        box.Parent = part -- Parents the box to the part
+
+        trackedParts[part] = true -- Adds the part to the tracked list
+    end
+
+    -- [GUI CỦA BẠN]
+    local gui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+    gui.Name = "AimWallGUI"
+    gui.ResetOnSpawn = false
+    gui.DisplayOrder = 9999
+
+    local frame = Instance.new("Frame", gui)
+    frame.Size = UDim2.new(0, 260, 0, 418)
+    frame.Position = UDim2.new(0, 20, 0, 60)
+    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    frame.Active = true
+    frame.Draggable = true
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+
+    local function createButton(text, positionY, color)
+        local button = Instance.new("TextButton", frame)
+        button.Size = UDim2.new(0.9, 0, 0, 30)
+        button.Position = UDim2.new(0.05, 0, 0, positionY)
+        button.Text = text
+        button.BackgroundColor3 = color
+        button.TextColor3 = Color3.new(1, 1, 1)
+        button.Font = Enum.Font.GothamBold
+        button.TextSize = 16
+        Instance.new("UICorner", button).CornerRadius = UDim.new(0, 6)
+        return button
+    end
+
+    -- ... [Ở ĐÂY TÔI GIẢ ĐỊNH CÁC NÚT VÀ LOGIC KHÁC CỦA BẠN TIẾP TỤC] ...
+    -- ĐỂ KẾT NỐI NÚT D:
+    ClickBtn.MouseButton1Click:Connect(function()
+        guiVisible = not guiVisible
+        frame.Visible = guiVisible
+    end)
+    
+    -- [KẾT THÚC VÍ DỤ - BẠN HÃY DÁN TOÀN BỘ PHẦN CÒN LẠI CỦA SCRIPT BẠN VÀO ĐÂY]
+    print("Script Loaded with D-Button Support")
 end)

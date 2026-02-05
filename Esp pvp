@@ -1,0 +1,175 @@
+-- BRM5 v6.5 by Dexter (UI Fixed Version)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+
+-- --- CONFIG & STATE ---
+local espEnabled = false
+local noRecoilEnabled = false
+local TARGET_NAME = "Male"
+local TARGET_PART = "Head"
+local trackedParts = {}
+
+-- --- LOGIC ESP (WALL) ---
+local function createBoxForPart(part)
+    if not part or not part.Parent or part:FindFirstChild("Wall_Box") then return end
+    local box = Instance.new("BoxHandleAdornment")
+    box.Name = "Wall_Box"
+    box.Size = part.Size + Vector3.new(0.1, 0.1, 0.1)
+    box.Adornee = part
+    box.AlwaysOnTop = true
+    box.ZIndex = 10
+    box.Color3 = Color3.fromRGB(255, 0, 0)
+    box.Transparency = espEnabled and 0.3 or 1
+    box.Parent = part
+    trackedParts[part] = true
+end
+
+local function updateESP(state)
+    espEnabled = state
+    for part, _ in pairs(trackedParts) do
+        if part and part:FindFirstChild("Wall_Box") then
+            part.Wall_Box.Transparency = state and 0.3 or 1
+        end
+    end
+    if state then
+        for _, v in ipairs(Workspace:GetDescendants()) do
+            if v:IsA("Model") and v.Name == TARGET_NAME then
+                local head = v:FindFirstChild(TARGET_PART)
+                if head then createBoxForPart(head) end
+            end
+        end
+    end
+end
+
+-- --- LOGIC NO RECOIL ---
+local function updateRecoil(state)
+    noRecoilEnabled = state
+    if state then
+        pcall(function()
+            local weapons = game:GetService("ReplicatedStorage").Shared.Configs.Weapon.Weapons_Player
+            for _, platform in pairs(weapons:GetChildren()) do
+                if platform.Name:match("^Platform_") then
+                    for _, wp in pairs(platform:GetChildren()) do
+                        for _, child in pairs(wp:GetChildren()) do
+                            if child:IsA("ModuleScript") and child.Name:match("^Receiver") then
+                                local tune = require(child).Config.Tune
+                                tune.Recoil_X = 0
+                                tune.Recoil_Z = 0
+                                tune.RecoilForce_Tap = 0
+                                tune.RecoilForce_Impulse = 0
+                                tune.Recoil_Camera = 0
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+end
+
+-- --- UI CREATION ---
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "Dexter_UI_v3"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local Main = Instance.new("Frame")
+Main.Name = "Main"
+Main.Size = UDim2.new(0, 220, 0, 160)
+Main.Position = UDim2.new(0.5, -110, 0.5, -80)
+Main.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Main.BorderSizePixel = 0
+Main.Parent = ScreenGui
+
+-- UI Design Elements
+local Corner = Instance.new("UICorner", Main)
+Corner.CornerRadius = UDim.new(0, 10)
+
+local Stroke = Instance.new("UIStroke", Main)
+Stroke.Color = Color3.fromRGB(0, 255, 127)
+Stroke.Thickness = 1.5
+
+local Header = Instance.new("Frame", Main)
+Header.Size = UDim2.new(1, 0, 0, 35)
+Header.BackgroundTransparency = 1
+
+local Title = Instance.new("TextLabel", Header)
+Title.Size = UDim2.new(1, 0, 1, 0)
+Title.Text = "BRM5 CONTROL"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+Title.BackgroundTransparency = 1
+
+-- Button Builder
+local function CreateButton(text, yPos, callback)
+    local Btn = Instance.new("TextButton", Main)
+    Btn.Size = UDim2.new(0.85, 0, 0, 35)
+    Btn.Position = UDim2.new(0.075, 0, 0, yPos)
+    Btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    Btn.Text = text .. ": OFF"
+    Btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    Btn.Font = Enum.Font.GothamSemibold
+    Btn.TextSize = 13
+    Btn.BorderSizePixel = 0
+    
+    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
+
+    local active = false
+    Btn.MouseButton1Click:Connect(function()
+        active = not active
+        Btn.Text = text .. ": " .. (active and "ON" or "OFF")
+        Btn.BackgroundColor3 = active and Color3.fromRGB(0, 150, 80) or Color3.fromRGB(45, 45, 45)
+        Btn.TextColor3 = active and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
+        callback(active)
+    end)
+end
+
+CreateButton("ESP Wall", 50, updateESP)
+CreateButton("No Recoil", 100, updateRecoil)
+
+-- --- DRAG SYSTEM (CUSTOM) ---
+local dragging, dragInput, dragStart, startPos
+
+local function update(input)
+    local delta = input.Position - dragStart
+    Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+Main.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = Main.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+Main.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        update(input)
+    end
+end)
+
+-- Toggle Visible with Insert
+UserInputService.InputBegan:Connect(function(input, processed)
+    if not processed and input.KeyCode == Enum.KeyCode.Insert then
+        Main.Visible = not Main.Visible
+    end
+end)
+
+print("Script Loaded - Bấm Insert để ẩn hiện")

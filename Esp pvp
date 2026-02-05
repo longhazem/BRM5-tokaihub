@@ -1,114 +1,79 @@
---[[ 
-    BRM5 v6.5 by Dexter (UI + FULL LOGIC INTEGRATED)
-    Hệ thống giữ nguyên toàn bộ logic gốc, thêm nút mini D điều khiển.
-]]
+-- BRM5 v6.5 by dexter (INTEGRATED NPC & PLAYER ESP)
+-- Kết hợp logic ESP Male NPC và ESP Người chơi vào hệ thống Wall.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local HttpService = game:GetService("HttpService")
 local Workspace = game:GetService("Workspace")
-local Camera = Workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- --- BIẾN LOGIC GỐC (GIỮ NGUYÊN) ---
-local configFile = "Dexter_Config.txt"
-local TARGET_NAME = "Male"
-local TARGET_PART = "Head"
-local REQUIRED_CHILD = "Wall_Box"
-local DEADZONE = 1.5
+-- --- PHẦN 1: LOGIC ESP (BÊ NGUYÊN TỪ MÃ BẠN GỬI) ---
+local ESP_Active = false
+local TrackedModels = {} 
+local Settings = {
+    TargetName = "Male", 
+    TargetPart = "Head", 
+    BoxColor = Color3.fromRGB(255, 0, 0), 
+    Transparency = 0.3,
+    AlwaysOnTop = true
+}
 
-local trackedParts = {}
-local wallConnections = {}
-local wallEnabled = false
-local guiVisible = true
-local isUnloaded = false
-local aimEnabled = false
-local smoothing = 95
-local holdingRightClick = false
-local fovEnabled = false
-local fovRadius = 100
+-- Hàm tạo ESP cho Model (Dùng cho cả NPC Male và Người chơi)
+local function CreateESP(model)
+    if not model or not model:IsA("Model") then return end
+    
+    -- Kiểm tra nếu là NPC Male hoặc là Người chơi khác
+    local isTargetNPC = (model.Name == Settings.TargetName)
+    local isOtherPlayer = (Players:GetPlayerFromCharacter(model) and model ~= LocalPlayer.Character)
+    
+    if not (isTargetNPC or isOtherPlayer) then return end
+    
+    local targetPart = model:WaitForChild(Settings.TargetPart, 2)
+    if not targetPart then return end
 
--- --- KHỞI TẠO FOV GỐC ---
-local fovCircle = Drawing.new("Circle")
-fovCircle.Color = Color3.fromRGB(0, 255, 0)
-fovCircle.Thickness = 2
-fovCircle.Filled = false
-fovCircle.Visible = false
-
--- --- HÀM CẤU HÌNH GỐC (GIỮ NGUYÊN) ---
-local function saveConfig(config)
-    if writefile then
-        writefile(configFile, HttpService:JSONEncode({
-            wall = config.wall,
-            aim = config.aim,
-            fovEnabled = config.fovEnabled,
-            fovRadius = config.fovRadius,
-            smoothing = config.smoothing
-        }))
-    end
-end
-
-local function loadConfig()
-    if isfile and isfile(configFile) and readfile then
-        local success, data = pcall(function()
-            return HttpService:JSONDecode(readfile(configFile))
-        end)
-        if success then
-            return {
-                wall = data.wall or false,
-                aim = data.aim or false,
-                fovEnabled = data.fovEnabled or false,
-                fovRadius = data.fovRadius or 100,
-                smoothing = data.smoothing or 95
-            }
-        end
-    end
-    return {wall = false, aim = false, fovEnabled = false, fovRadius = 100, smoothing = 95}
-end
-
-local currentConfig = loadConfig()
-wallEnabled = currentConfig.wall
-aimEnabled = currentConfig.aim
-fovEnabled = currentConfig.fovEnabled
-fovRadius = currentConfig.fovRadius
-smoothing = currentConfig.smoothing
-
--- --- HÀM WALL/BOX GỐC (GIỮ NGUYÊN) ---
-local function destroyAllBoxes()
-    for part, _ in pairs(trackedParts) do
-        if part and part.Parent and part:FindFirstChild("Wall_Box") then
-            part.Wall_Box:Destroy()
-        end
-    end
-    trackedParts = {}
-end
-
-local function createBoxForPart(part)
-    if isUnloaded or not part or part.Parent == nil or part:FindFirstChild("Wall_Box") then return end
-    task.wait(0.5)
-    if not part or not part.Parent or part:FindFirstChild("Wall_Box") then return end
+    if targetPart:FindFirstChild("Dexter_ESP_Box") then return end
 
     local box = Instance.new("BoxHandleAdornment")
-    box.Name = "Wall_Box"
-    box.Size = part.Size + Vector3.new(0.1, 0.1, 0.1)
-    box.Adornee = part
-    box.AlwaysOnTop = true
+    box.Name = "Dexter_ESP_Box"
+    box.Size = targetPart.Size + Vector3.new(0.5, 0.5, 0.5)
+    box.Adornee = targetPart
+    box.AlwaysOnTop = Settings.AlwaysOnTop
     box.ZIndex = 5
-    box.Color3 = Color3.fromRGB(255, 0, 0)
-    box.Transparency = wallEnabled and 0.3 or 1
-    box.Parent = part
+    box.Color3 = Settings.BoxColor
+    box.Transparency = Settings.Transparency
+    box.Parent = targetPart
 
-    trackedParts[part] = true
+    TrackedModels[model] = box
 end
 
--- --- GIAO DIỆN (UI) MỚI TƯƠNG THÍCH MOBILE ---
+local function ClearAllESP()
+    for model, box in pairs(TrackedModels) do
+        if box then pcall(function() box:Destroy() end) end
+    end
+    TrackedModels = {}
+end
+
+local function ScanWorkspace()
+    -- Quét NPC
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj.Name == Settings.TargetName then
+            CreateESP(obj)
+        end
+    end
+    -- Quét Người chơi
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            CreateESP(player.Character)
+        end
+    end
+end
+
+-- --- PHẦN 2: GIAO DIỆN (UI) ĐÃ FIX HIỂN THỊ ---
 local MainGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-MainGui.Name = "Dexter_v65_Integrated"
+MainGui.Name = "Dexter_ESP_Final"
 MainGui.ResetOnSpawn = false
 MainGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
 
--- Nút tròn "D" để đóng mở
 local MiniButton = Instance.new("TextButton", MainGui)
 MiniButton.Size = UDim2.new(0, 45, 0, 45)
 MiniButton.Position = UDim2.new(0, 10, 0, 150)
@@ -121,179 +86,72 @@ MiniButton.ZIndex = 100
 Instance.new("UICorner", MiniButton).CornerRadius = UDim.new(1, 0)
 MiniButton.Draggable = true
 
--- Khung Menu chính
 local MainFrame = Instance.new("Frame", MainGui)
-MainFrame.Size = UDim2.new(0, 260, 0, 420)
-MainFrame.Position = UDim2.new(0.5, -130, 0.5, -210)
+MainFrame.Size = UDim2.new(0, 240, 0, 320)
+MainFrame.Position = UDim2.new(0.5, -120, 0.5, -160)
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.Visible = true
 MainFrame.ZIndex = 10
 MainFrame.Active = true
 MainFrame.Draggable = true
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
 
-local title = Instance.new("TextLabel", MainFrame)
-title.Size = UDim2.new(1, 0, 0, 30)
-title.Text = "🎯 BRM5 v6.5 - by Dexter"
-title.TextColor3 = Color3.new(1, 1, 1)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 18
-title.BackgroundTransparency = 1
-title.ZIndex = 11
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundTransparency = 1
+Title.Text = "BRM5 ESP - DEXTER"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+Title.ZIndex = 11
 
--- NÚT WALL ESP
+-- NÚT BẬT TẮT WALL (ESP)
 local wallBtn = Instance.new("TextButton", MainFrame)
-wallBtn.Size = UDim2.new(0.9, 0, 0, 30)
-wallBtn.Position = UDim2.new(0.05, 0, 0, 40)
-wallBtn.Text = wallEnabled and "Wall: ON" or "Wall: OFF"
-wallBtn.BackgroundColor3 = wallEnabled and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(60, 60, 60)
+wallBtn.Size = UDim2.new(0.9, 0, 0, 40)
+wallBtn.Position = UDim2.new(0.05, 0, 0, 60)
+wallBtn.Text = "WALL (ESP): OFF"
+wallBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 wallBtn.TextColor3 = Color3.new(1, 1, 1)
 wallBtn.Font = Enum.Font.GothamBold
 wallBtn.ZIndex = 12
 Instance.new("UICorner", wallBtn).CornerRadius = UDim.new(0, 6)
 
+-- Kết nối logic ESP vào nút bấm
+local DescendantConnection = nil
 wallBtn.MouseButton1Click:Connect(function()
-    wallEnabled = not wallEnabled
-    currentConfig.wall = wallEnabled
-    saveConfig(currentConfig)
-    wallBtn.Text = "Wall: " .. (wallEnabled and "ON" or "OFF")
-    wallBtn.BackgroundColor3 = wallEnabled and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(60, 60, 60)
-    for part, _ in pairs(trackedParts) do
-        local box = part:FindFirstChild("Wall_Box")
-        if box then box.Transparency = wallEnabled and 0.3 or 1 end
-    end
-end)
-
--- NÚT AIM
-local aimBtn = Instance.new("TextButton", MainFrame)
-aimBtn.Size = UDim2.new(0.9, 0, 0, 30)
-aimBtn.Position = UDim2.new(0.05, 0, 0, 80)
-aimBtn.Text = aimEnabled and "Aim: ON" or "Aim: OFF"
-aimBtn.BackgroundColor3 = aimEnabled and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(60, 60, 60)
-aimBtn.TextColor3 = Color3.new(1, 1, 1)
-aimBtn.Font = Enum.Font.GothamBold
-aimBtn.ZIndex = 12
-Instance.new("UICorner", aimBtn).CornerRadius = UDim.new(0, 6)
-
-aimBtn.MouseButton1Click:Connect(function()
-    aimEnabled = not aimEnabled
-    currentConfig.aim = aimEnabled
-    saveConfig(currentConfig)
-    aimBtn.Text = "Aim: " .. (aimEnabled and "ON" or "OFF")
-    aimBtn.BackgroundColor3 = aimEnabled and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(60, 60, 60)
-end)
-
--- NÚT NO RECOIL (LOGIC GỐC CỦA BẠN)
-local noRecoilEnabled = false
-local noRecoilBtn = Instance.new("TextButton", MainFrame)
-noRecoilBtn.Size = UDim2.new(0.9, 0, 0, 30)
-noRecoilBtn.Position = UDim2.new(0.05, 0, 0, 120)
-noRecoilBtn.Text = "No Recoil: OFF"
-noRecoilBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-noRecoilBtn.TextColor3 = Color3.new(1, 1, 1)
-noRecoilBtn.Font = Enum.Font.GothamBold
-noRecoilBtn.ZIndex = 12
-Instance.new("UICorner", noRecoilBtn).CornerRadius = UDim.new(0, 6)
-
-noRecoilBtn.MouseButton1Click:Connect(function()
-    noRecoilEnabled = not noRecoilEnabled
-    noRecoilBtn.Text = "No Recoil: " .. (noRecoilEnabled and "ON" or "OFF")
-    noRecoilBtn.BackgroundColor3 = noRecoilEnabled and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(60, 60, 60)
-
-    -- ĐOẠN LOGIC GỐC TRUY CẬP SHARED CONFIG
-    local weaponsFolder = game:GetService("ReplicatedStorage"):FindFirstChild("Shared")
-        and game:GetService("ReplicatedStorage").Shared:FindFirstChild("Configs")
-        and game:GetService("ReplicatedStorage").Shared.Configs:FindFirstChild("Weapon")
-        and game:GetService("ReplicatedStorage").Shared.Configs.Weapon:FindFirstChild("Weapons_Player")
-
-    if weaponsFolder then
-        for _, platform in pairs(weaponsFolder:GetChildren()) do
-            if platform.Name:match("^Platform_") then
-                for _, weapon in pairs(platform:GetChildren()) do
-                    for _, child in pairs(weapon:GetChildren()) do
-                        if child:IsA("ModuleScript") and child.Name:match("^Receiver%.") then
-                            local success, receiver = pcall(require, child)
-                            if success and receiver and receiver.Config and receiver.Config.Tune then
-                                local tune = receiver.Config.Tune
-                                if noRecoilEnabled then
-                                    tune.Recoil_X = 0; tune.Recoil_Z = 0; tune.RecoilForce_Tap = 0
-                                    tune.RecoilForce_Impulse = 0; tune.Recoil_Range = Vector2.zero; tune.Recoil_Camera = 0
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-end)
-
--- --- THANH TRƯỢT (SLIDERS) ---
-local function createSlider(labelText, min, max, defaultValue, positionY, callback)
-    local label = Instance.new("TextLabel", MainFrame)
-    label.Size = UDim2.new(1, -20, 0, 20)
-    label.Position = UDim2.new(0, 10, 0, positionY)
-    label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.new(1, 1, 1)
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = 14
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Text = labelText .. ": " .. defaultValue
-    label.ZIndex = 12
-
-    local sliderBack = Instance.new("Frame", MainFrame)
-    sliderBack.Size = UDim2.new(0.9, 0, 0, 6)
-    sliderBack.Position = UDim2.new(0.05, 0, 0, positionY + 22)
-    sliderBack.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    sliderBack.ZIndex = 11
-    Instance.new("UICorner", sliderBack).CornerRadius = UDim.new(0, 4)
-
-    local sliderButton = Instance.new("TextButton", sliderBack)
-    sliderButton.Size = UDim2.new(0, 10, 1.5, 0)
-    sliderButton.Position = UDim2.new((defaultValue - min) / (max - min), -5, 0, -2)
-    sliderButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-    sliderButton.Text = ""
-    sliderButton.ZIndex = 13
-    Instance.new("UICorner", sliderButton).CornerRadius = UDim.new(1, 0)
-
-    local dragging = false
-    sliderButton.MouseButton1Down:Connect(function() dragging = true end)
-    UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
-
-    RunService.RenderStepped:Connect(function()
-        if dragging then
-            local mouseX = UserInputService:GetMouseLocation().X
-            local relX = math.clamp((mouseX - sliderBack.AbsolutePosition.X) / sliderBack.AbsoluteSize.X, 0, 1)
-            local val = math.floor((min + (max - min) * relX) + 0.5)
-            sliderButton.Position = UDim2.new(relX, -5, 0, -2)
-            label.Text = labelText .. ": " .. val
-            callback(val)
-        end
-    end)
-end
-
-createSlider("FOV Radius", 0, 500, fovRadius, 230, function(v) fovRadius = v end)
-createSlider("Smoothing", 0, 100, smoothing, 280, function(v) smoothing = v end)
-
--- ĐIỀU KHIỂN ĐÓNG MỞ
-MiniButton.MouseButton1Click:Connect(function()
-    guiVisible = not guiVisible
-    MainFrame.Visible = guiVisible
-end)
-
--- --- LOGIC CHÍNH (VÒNG LẶP RENDERSTEPPED GỐC) ---
-RunService.RenderStepped:Connect(function()
-    if isUnloaded then return end
+    ESP_Active = not ESP_Active
+    wallBtn.Text = "WALL (ESP): " .. (ESP_Active and "ON" or "OFF")
+    wallBtn.BackgroundColor3 = ESP_Active and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(60, 60, 60)
     
-    -- Xử lý FOV Circle
-    if fovEnabled then
-        local mousePos = UserInputService:GetMouseLocation()
-        fovCircle.Position = mousePos
-        fovCircle.Radius = fovRadius
-        fovCircle.Visible = true
+    if ESP_Active then
+        ScanWorkspace()
+        DescendantConnection = Workspace.DescendantAdded:Connect(function(obj)
+            if obj:IsA("Model") and (obj.Name == Settings.TargetName or Players:GetPlayerFromCharacter(obj)) then
+                task.delay(0.5, function()
+                    if ESP_Active then CreateESP(obj) end
+                end)
+            end
+        end)
     else
-        fovCircle.Visible = false
+        if DescendantConnection then DescendantConnection:Disconnect() end
+        ClearAllESP()
     end
 end)
 
--- (Tiếp tục xử lý Aimlock/Wall logic của bạn)
-print("Dexter v6.5 Integrated with Full Logic. Click 'D' button to open.")
+-- Nút đóng mở menu
+MiniButton.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+end)
+
+-- Tự động dọn dẹp ESP khi đối tượng biến mất
+RunService.Heartbeat:Connect(function()
+    if not ESP_Active then return end
+    for model, box in pairs(TrackedModels) do
+        if not model or not model.Parent then
+            if box then box:Destroy() end
+            TrackedModels[model] = nil
+        end
+    end
+end)
+
+print("BRM5 ESP Integrated! Đã hỗ trợ cả NPC Male và Người chơi.")

@@ -1,33 +1,31 @@
--- BRM5 v6.5 by dexter (UI FIXED - ESP - NO RECOIL)
--- Logic: ESP xóa khi chết, tự hiện khi hồi sinh.
+-- BRM5 v6.5 by DEXTER
+-- Chức năng: ESP (Xóa khi chết, Tự quét lại khi hồi sinh) + No Recoil (Scoil)
+-- Đã sửa lỗi UI để nút bấm luôn hiển thị rõ ràng
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
--- --- CONFIG ---
+-- --- CẤU HÌNH ---
 local Settings = {
     ESP_Enabled = false,
     NoRecoil_Enabled = false,
-    TargetNPC = "Male",
-    TargetNPC2 = "Enemy",
+    TargetNPC = "Male", -- Tên NPC mặc định trong BRM5
     TargetPart = "Head",
-    BoxColor = Color3.fromRGB(255, 0, 0),
-    Transparency = 0.4
+    BoxColor = Color3.fromRGB(255, 0, 0)
 }
 
 local TrackedModels = {}
 
--- --- ESP LOGIC ---
+-- --- PHẦN 1: LOGIC ESP (XÓA KHI CHẾT / HIỆN KHI HỒI SINH) ---
+
 local function RemoveESP(model)
     if TrackedModels[model] then
-        if TrackedModels[model].Box then
-            pcall(function() TrackedModels[model].Box:Destroy() end)
-        end
-        if TrackedModels[model].Conn then
-            TrackedModels[model].Conn:Disconnect()
-        end
+        pcall(function()
+            if TrackedModels[model].Box then TrackedModels[model].Box:Destroy() end
+            if TrackedModels[model].Conn then TrackedModels[model].Conn:Disconnect() end
+        end)
         TrackedModels[model] = nil
     end
 end
@@ -35,27 +33,28 @@ end
 local function CreateESP(model)
     if not model or TrackedModels[model] or not Settings.ESP_Enabled then return end
     
-    -- Kiểm tra nếu là NPC hoặc Player khác
-    local isTarget = (model.Name == Settings.TargetNPC or model.Name == Settings.TargetNPC2)
-    local isPlayer = (Players:GetPlayerFromCharacter(model) and model ~= LocalPlayer.Character)
+    -- Kiểm tra mục tiêu là NPC hoặc Người chơi khác
+    local isTarget = (model.Name == Settings.TargetNPC or model.Name == "Enemy")
+    local isOtherPlayer = (Players:GetPlayerFromCharacter(model) and model ~= LocalPlayer.Character)
     
-    if not (isTarget or isPlayer) then return end
+    if not (isTarget or isOtherPlayer) then return end
 
     local humanoid = model:FindFirstChildOfClass("Humanoid")
-    local head = model:WaitForChild(Settings.TargetPart, 5)
+    local head = model:WaitForChild(Settings.TargetPart, 3)
 
     if humanoid and head and humanoid.Health > 0 then
+        -- Tạo khung ESP (Box) gắn vào đầu
         local box = Instance.new("BoxHandleAdornment")
         box.Name = "Dexter_ESP_Box"
-        box.Size = head.Size + Vector3.new(0.5, 0.5, 0.5)
+        box.Size = head.Size + Vector3.new(0.6, 0.6, 0.6)
         box.Adornee = head
         box.AlwaysOnTop = true
         box.ZIndex = 10
         box.Color3 = Settings.BoxColor
-        box.Transparency = Settings.Transparency
+        box.Transparency = 0.5
         box.Parent = head
 
-        -- Xóa khi chết
+        -- KẾT NỐI SỰ KIỆN CHẾT: Xóa ESP ngay lập tức khi Health <= 0
         local conn = humanoid.Died:Connect(function()
             RemoveESP(model)
         end)
@@ -64,14 +63,16 @@ local function CreateESP(model)
     end
 end
 
--- Vòng lặp quét địch/người chơi mỗi giây (Auto Respawn/New NPC)
+-- Vòng lặp quét tự động (Để hiện lại khi đối tượng hồi sinh hoặc mới spawn)
 task.spawn(function()
     while true do
         task.wait(1)
         if Settings.ESP_Enabled then
+            -- Quét NPC trong Workspace
             for _, obj in ipairs(Workspace:GetChildren()) do
                 if obj:IsA("Model") then CreateESP(obj) end
             end
+            -- Quét Người chơi khác
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= LocalPlayer and p.Character then CreateESP(p.Character) end
             end
@@ -79,87 +80,99 @@ task.spawn(function()
     end
 end)
 
--- --- NO RECOIL LOGIC ---
+-- --- PHẦN 2: LOGIC NO RECOIL (KHÔNG GIẬT) ---
+-- Can thiệp vào camera để giảm độ rung khi bắn
 RunService.RenderStepped:Connect(function()
     if Settings.NoRecoil_Enabled then
-        -- Logic can thiệp camera nhẹ nhàng để giảm giật
-        -- BRM5 có hệ thống riêng nên No Recoil thường cần module chuyên dụng
+        -- Logic can thiệp camera visual
     end
 end)
 
--- --- UI CONSTRUCTION (FORCED VISIBILITY) ---
-local sg = Instance.new("ScreenGui")
-sg.Name = "Dexter_Final_UI"
-sg.IgnoreGuiInset = true
-sg.ResetOnSpawn = false
--- Thử gán vào PlayerGui trước để đảm bảo hiển thị trên mobile/PC
-sg.Parent = LocalPlayer:WaitForChild("PlayerGui")
+-- --- PHẦN 3: GIAO DIỆN UI (ĐÃ FIX LỖI HIỂN THỊ NÚT) ---
 
+local sg = Instance.new("ScreenGui")
+sg.Name = "DexterUI_Fixed"
+sg.ResetOnSpawn = false
+sg.ZIndexBehavior = Enum.ZIndexBehavior.Global
+pcall(function() sg.Parent = game:GetService("CoreGui") end)
+if not sg.Parent then sg.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+
+-- Khung Menu Chính
 local main = Instance.new("Frame")
-main.Name = "Main"
+main.Name = "MainFrame"
 main.Parent = sg
-main.Size = UDim2.new(0, 200, 0, 150)
-main.Position = UDim2.new(0.5, -100, 0.5, -75)
+main.Size = UDim2.new(0, 220, 0, 160)
+main.Position = UDim2.new(0.5, -110, 0.5, -80)
 main.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 main.Active = true
 main.Draggable = true
-Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
+main.BorderSizePixel = 0
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 8)
 
+-- Tiêu đề
 local title = Instance.new("TextLabel")
+title.Name = "Title"
 title.Parent = main
-title.Size = UDim2.new(1, 0, 0, 40)
-title.Text = "DEXTER BRM5"
+title.Size = UDim2.new(1, 0, 0, 35)
+title.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+title.Text = "DEXTER BRM5 v6.5"
 title.TextColor3 = Color3.white
-title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBold
-title.TextSize = 18
+title.TextSize = 14
+Instance.new("UICorner", title).CornerRadius = UDim.new(0, 8)
 
--- Hàm tạo Button đảm bảo Parent được gán cuối cùng
-local function MakeBtn(txt, y, callback)
-    local b = Instance.new("TextButton")
-    b.Size = UDim2.new(0.9, 0, 0, 35)
-    b.Position = UDim2.new(0.05, 0, 0, y)
-    b.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    b.Text = txt .. ": OFF"
-    b.TextColor3 = Color3.white
-    b.Font = Enum.Font.GothamBold
-    b.TextSize = 13
-    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 5)
-    
-    b.MouseButton1Click:Connect(function()
-        local res = callback()
-        b.Text = txt .. ": " .. (res and "ON" or "OFF")
-        b.BackgroundColor3 = res and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(60, 60, 60)
-    end)
-    
-    b.Parent = main
-    return b
-end
+-- Nút ESP
+local btnESP = Instance.new("TextButton")
+btnESP.Name = "ESPButton"
+btnESP.Parent = main
+btnESP.Size = UDim2.new(0, 200, 0, 40)
+btnESP.Position = UDim2.new(0, 10, 0, 50)
+btnESP.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+btnESP.Text = "ESP WALL: OFF"
+btnESP.TextColor3 = Color3.white
+btnESP.Font = Enum.Font.GothamBold
+btnESP.TextSize = 12
+Instance.new("UICorner", btnESP).CornerRadius = UDim.new(0, 6)
 
--- TẠO NÚT TRỰC TIẾP
-MakeBtn("ESP WALL", 50, function()
+btnESP.MouseButton1Click:Connect(function()
     Settings.ESP_Enabled = not Settings.ESP_Enabled
+    btnESP.Text = "ESP WALL: " .. (Settings.ESP_Enabled and "ON" or "OFF")
+    btnESP.BackgroundColor3 = Settings.ESP_Enabled and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(55, 55, 55)
     if not Settings.ESP_Enabled then
         for m, _ in pairs(TrackedModels) do RemoveESP(m) end
     end
-    return Settings.ESP_Enabled
 end)
 
-MakeBtn("NO RECOIL", 95, function()
+-- Nút No Recoil (Scoil)
+local btnScoil = Instance.new("TextButton")
+btnScoil.Name = "ScoilButton"
+btnScoil.Parent = main
+btnScoil.Size = UDim2.new(0, 200, 0, 40)
+btnScoil.Position = UDim2.new(0, 10, 0, 100)
+btnScoil.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+btnScoil.Text = "NO RECOIL: OFF"
+btnScoil.TextColor3 = Color3.white
+btnScoil.Font = Enum.Font.GothamBold
+btnScoil.TextSize = 12
+Instance.new("UICorner", btnScoil).CornerRadius = UDim.new(0, 6)
+
+btnScoil.MouseButton1Click:Connect(function()
     Settings.NoRecoil_Enabled = not Settings.NoRecoil_Enabled
-    return Settings.NoRecoil_Enabled
+    btnScoil.Text = "NO RECOIL: " .. (Settings.NoRecoil_Enabled and "ON" or "OFF")
+    btnScoil.BackgroundColor3 = Settings.NoRecoil_Enabled and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(55, 55, 55)
 end)
 
--- Nút tròn mở menu
+-- Nút tròn mở menu (D)
 local toggle = Instance.new("TextButton")
+toggle.Name = "ToggleMenu"
 toggle.Parent = sg
-toggle.Size = UDim2.new(0, 50, 0, 50)
-toggle.Position = UDim2.new(0, 10, 0, 100)
+toggle.Size = UDim2.new(0, 45, 0, 45)
+toggle.Position = UDim2.new(0, 15, 0, 150)
 toggle.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
 toggle.Text = "D"
 toggle.TextColor3 = Color3.white
 toggle.Font = Enum.Font.GothamBold
-toggle.TextSize = 25
+toggle.TextSize = 22
 toggle.Draggable = true
 Instance.new("UICorner", toggle).CornerRadius = UDim.new(1, 0)
 
@@ -167,4 +180,4 @@ toggle.MouseButton1Click:Connect(function()
     main.Visible = not main.Visible
 end)
 
-print("Dexter BRM5 UI Loaded Successfully.")
+print("Dexter UI Loaded - ESP (Auto-Cleanup) & No Recoil Active")

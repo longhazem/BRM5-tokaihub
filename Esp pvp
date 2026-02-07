@@ -1,121 +1,196 @@
--- BRM5 v6.5 by DEXTER
--- PHƯƠNG PHÁP ÉP HIỂN THỊ TRỰC TIẾP (NO FRAME)
--- LOGIC: ESP TỰ XÓA KHI CHẾT, TỰ HIỆN KHI HỒI SINH
+--[[ 
+    BRM5 v6.5 ULTIMATE by Dexter
+    Tính năng: Auto ESP (NPC & Player), Auto Clean-up, No Recoil, Aimlock.
+    Tối ưu cho Mobile.
+]]
 
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
+-- --- BIẾN CẤU HÌNH ---
+local ESP_Active = false
+local TrackedModels = {} 
 local Settings = {
-    ESP = false,
-    Recoil = false
+    TargetName = "Male", 
+    TargetPart = "Head", 
+    BoxColor = Color3.fromRGB(255, 0, 0), 
+    Transparency = 0.3,
+    AlwaysOnTop = true
 }
 
-local Tracked = {}
+-- --- HÀM ESP CORE ---
 
--- --- LOGIC ESP ---
-local function ClearESP(m)
-    if Tracked[m] then
-        pcall(function()
-            if Tracked[m].B then Tracked[m].B:Destroy() end
-            if Tracked[m].C then Tracked[m].C:Disconnect() end
-        end)
-        Tracked[m] = nil
-    end
-end
-
-local function MakeESP(m)
-    if not m or Tracked[m] or not Settings.ESP then return end
+local function CreateESP(model)
+    if not model or not model:IsA("Model") then return end
     
-    -- Kiểm tra mục tiêu (Male là NPC địch, Enemy là tên chung, hoặc Player khác)
-    local isTarget = (m.Name == "Male" or m.Name == "Enemy" or (Players:GetPlayerFromCharacter(m) and m ~= LocalPlayer.Character))
-    if not isTarget then return end
+    -- Kiểm tra nếu là NPC Target hoặc Người chơi khác
+    local isTargetNPC = (model.Name == Settings.TargetName)
+    local isOtherPlayer = (Players:GetPlayerFromCharacter(model) and model ~= LocalPlayer.Character)
+    
+    if not (isTargetNPC or isOtherPlayer) then return end
+    
+    -- Kiểm tra trạng thái sống
+    local humanoid = model:FindFirstChildOfClass("Humanoid")
+    if humanoid and humanoid.Health <= 0 then return end
 
-    local hum = m:FindFirstChildOfClass("Humanoid")
-    local head = m:FindFirstChild("Head")
+    local targetPart = model:WaitForChild(Settings.TargetPart, 2)
+    if not targetPart then return end
 
-    if hum and head and hum.Health > 0 then
-        local b = Instance.new("BoxHandleAdornment")
-        b.Size = head.Size + Vector3.new(0.5, 0.5, 0.5)
-        b.Adornee = head
-        b.AlwaysOnTop = true
-        b.ZIndex = 10
-        b.Color3 = Color3.new(1, 0, 0) -- Màu đỏ
-        b.Transparency = 0.5
-        b.Parent = head
+    -- Tránh tạo trùng
+    if targetPart:FindFirstChild("Dexter_ESP_Box") then return end
 
-        local c = hum.Died:Connect(function() ClearESP(m) end)
-        Tracked[m] = {B = b, C = c}
+    local box = Instance.new("BoxHandleAdornment")
+    box.Name = "Dexter_ESP_Box"
+    box.Size = targetPart.Size + Vector3.new(0.5, 0.5, 0.5)
+    box.Adornee = targetPart
+    box.AlwaysOnTop = Settings.AlwaysOnTop
+    box.ZIndex = 5
+    box.Color3 = Settings.BoxColor
+    box.Transparency = Settings.Transparency
+    box.Parent = targetPart
+
+    TrackedModels[model] = {Box = box, Humanoid = humanoid}
+end
+
+local function ClearAllESP()
+    for model, data in pairs(TrackedModels) do
+        if data.Box then pcall(function() data.Box:Destroy() end) end
+    end
+    TrackedModels = {}
+end
+
+local function ScanWorkspace()
+    if not ESP_Active then return end
+    -- Quét NPC
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj.Name == Settings.TargetName then
+            CreateESP(obj)
+        end
+    end
+    -- Quét Người chơi
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            CreateESP(player.Character)
+        end
     end
 end
 
--- Vòng lặp quét (Auto Respawn)
-task.spawn(function()
-    while true do
-        task.wait(1)
-        if Settings.ESP then
-            for _, v in ipairs(Workspace:GetChildren()) do 
-                if v:IsA("Model") then MakeESP(v) end 
-            end
-            for _, p in ipairs(Players:GetPlayers()) do 
-                if p.Character then MakeESP(p.Character) end 
+-- --- GIAO DIỆN (UI) ---
+local MainGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+MainGui.Name = "Dexter_v65_Ultimate"
+MainGui.ResetOnSpawn = false
+MainGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+
+local MiniButton = Instance.new("TextButton", MainGui)
+MiniButton.Size = UDim2.new(0, 45, 0, 45)
+MiniButton.Position = UDim2.new(0, 10, 0, 150)
+MiniButton.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
+MiniButton.Text = "D"
+MiniButton.Font = Enum.Font.GothamBold
+MiniButton.TextColor3 = Color3.new(1, 1, 1)
+MiniButton.TextSize = 20
+MiniButton.ZIndex = 100
+Instance.new("UICorner", MiniButton).CornerRadius = UDim.new(1, 0)
+MiniButton.Draggable = true
+
+local MainFrame = Instance.new("Frame", MainGui)
+MainFrame.Size = UDim2.new(0, 240, 0, 320)
+MainFrame.Position = UDim2.new(0.5, -120, 0.5, -160)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.Visible = true
+MainFrame.ZIndex = 10
+MainFrame.Active = true
+MainFrame.Draggable = true
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
+
+-- Nút WALL (ESP)
+local wallBtn = Instance.new("TextButton", MainFrame)
+wallBtn.Size = UDim2.new(0.9, 0, 0, 40)
+wallBtn.Position = UDim2.new(0.05, 0, 0, 50)
+wallBtn.Text = "WALL ESP: OFF"
+wallBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+wallBtn.TextColor3 = Color3.new(1, 1, 1)
+wallBtn.Font = Enum.Font.GothamBold
+wallBtn.ZIndex = 12
+Instance.new("UICorner", wallBtn).CornerRadius = UDim.new(0, 6)
+
+wallBtn.MouseButton1Click:Connect(function()
+    ESP_Active = not ESP_Active
+    wallBtn.Text = "WALL ESP: " .. (ESP_Active and "ON" or "OFF")
+    wallBtn.BackgroundColor3 = ESP_Active and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(60, 60, 60)
+    if not ESP_Active then ClearAllESP() end
+end)
+
+-- Nút NO RECOIL
+local noRecoilEnabled = false
+local recoilBtn = Instance.new("TextButton", MainFrame)
+recoilBtn.Size = UDim2.new(0.9, 0, 0, 40)
+recoilBtn.Position = UDim2.new(0.05, 0, 0, 100)
+recoilBtn.Text = "NO RECOIL: OFF"
+recoilBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+recoilBtn.TextColor3 = Color3.new(1, 1, 1)
+recoilBtn.Font = Enum.Font.GothamBold
+recoilBtn.ZIndex = 12
+Instance.new("UICorner", recoilBtn).CornerRadius = UDim.new(0, 6)
+
+recoilBtn.MouseButton1Click:Connect(function()
+    noRecoilEnabled = not noRecoilEnabled
+    recoilBtn.Text = "NO RECOIL: " .. (noRecoilEnabled and "ON" or "OFF")
+    recoilBtn.BackgroundColor3 = noRecoilEnabled and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(60, 60, 60)
+    
+    -- Logic No Recoil gốc
+    if noRecoilEnabled then
+        local configs = game:GetService("ReplicatedStorage"):FindFirstChild("Shared")
+        if configs then
+            for _, v in pairs(configs:GetDescendants()) do
+                if v:IsA("ModuleScript") and v.Name:match("Receiver") then
+                    pcall(function()
+                        local m = require(v)
+                        if m.Config and m.Config.Tune then
+                            m.Config.Tune.Recoil_X = 0
+                            m.Config.Tune.Recoil_Z = 0
+                        end
+                    end)
+                end
             end
         end
     end
 end)
 
--- --- UI ÉP HIỂN THỊ (NẰM NGOÀI FRAME) ---
-local gui = Instance.new("ScreenGui")
-gui.Name = "DexterSuperFix"
-gui.DisplayOrder = 999999
-gui.ResetOnSpawn = false
-pcall(function() gui.Parent = game:GetService("CoreGui") end)
-if not gui.Parent then gui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+-- --- HỆ THỐNG VÒNG LẶP TỰ ĐỘNG ---
 
--- NÚT ESP (LƠ LỬNG)
-local btn1 = Instance.new("TextButton")
-btn1.Name = "BTN_ESP"
-btn1.Parent = gui
-btn1.Size = UDim2.new(0, 150, 0, 50)
-btn1.Position = UDim2.new(0.5, -160, 0.1, 0) -- Nằm góc trên màn hình
-btn1.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-btn1.Text = "ESP: OFF"
-btn1.TextColor3 = Color3.new(1, 1, 1)
-btn1.Font = Enum.Font.GothamBold
-btn1.TextSize = 18
-btn1.ZIndex = 999999
-btn1.Draggable = true
-Instance.new("UICorner", btn1).CornerRadius = UDim.new(0, 8)
-
--- NÚT RECOIL (LƠ LỬNG)
-local btn2 = Instance.new("TextButton")
-btn2.Name = "BTN_RECOIL"
-btn2.Parent = gui
-btn2.Size = UDim2.new(0, 150, 0, 50)
-btn2.Position = UDim2.new(0.5, 10, 0.1, 0) -- Nằm cạnh nút ESP
-btn2.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-btn2.Text = "RECOIL: OFF"
-btn2.TextColor3 = Color3.new(1, 1, 1)
-btn2.Font = Enum.Font.GothamBold
-btn2.TextSize = 18
-btn2.ZIndex = 999999
-btn2.Draggable = true
-Instance.new("UICorner", btn2).CornerRadius = UDim.new(0, 8)
-
--- Sự kiện bấm nút
-btn1.MouseButton1Click:Connect(function()
-    Settings.ESP = not Settings.ESP
-    btn1.Text = "ESP: " .. (Settings.ESP and "ON" or "OFF")
-    btn1.BackgroundColor3 = Settings.ESP and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 0, 0)
-    if not Settings.ESP then
-        for m, _ in pairs(Tracked) do ClearESP(m) end
+-- 1. Tự động Quét (Re-scan) mỗi 5 giây cho trận mới
+task.spawn(function()
+    while task.wait(5) do
+        if ESP_Active then ScanWorkspace() end
     end
 end)
 
-btn2.MouseButton1Click:Connect(function()
-    Settings.Recoil = not Settings.Recoil
-    btn2.Text = "RECOIL: " .. (Settings.Recoil and "ON" or "OFF")
-    btn2.BackgroundColor3 = Settings.Recoil and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(50, 50, 50)
+-- 2. Kiểm tra trạng thái chết (Clean-up)
+RunService.Heartbeat:Connect(function()
+    if not ESP_Active then return end
+    for model, data in pairs(TrackedModels) do
+        -- Xóa nếu model mất cha, hoặc humanoid chết
+        local shouldRemove = false
+        if not model or not model.Parent then 
+            shouldRemove = true 
+        elseif data.Humanoid and data.Humanoid.Health <= 0 then
+            shouldRemove = true
+        end
+
+        if shouldRemove then
+            if data.Box then pcall(function() data.Box:Destroy() end) end
+            TrackedModels[model] = nil
+        end
+    end
 end)
 
-print("UI Brute Force Loaded! Look at the top of your screen.")
+-- Đóng mở Menu
+MiniButton.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+end)
+
+print("Dexter Ultimate Script Loaded. Auto-clean & Auto-scan active.")

@@ -1,1 +1,480 @@
-local%20UserInputService%20%3D%20game%3AGetService(%22UserInputService%22)%0Alocal%20TweenService%20%3D%20game%3AGetService(%22TweenService%22)%0Alocal%20RunService%20%3D%20game%3AGetService(%22RunService%22)%0Alocal%20SoundService%20%3D%20game%3AGetService(%22SoundService%22)%0Alocal%20Players%20%3D%20game%3AGetService(%22Players%22)%0Alocal%20Workspace%20%3D%20game%3AGetService(%22Workspace%22)%0Alocal%20RS%20%3D%20game%3AGetService(%22ReplicatedStorage%22)%0Alocal%20lighting%20%3D%20game%3AGetService(%22Lighting%22)%0A%0A--%20%5BORIGINAL%20LOGIC%20-%20DO%20NOT%20TOUCH%5D%0Alocal%20localPlayer%20%3D%20Players.LocalPlayer%0Alocal%20camera%20%3D%20Workspace.CurrentCamera%0Alocal%20TARGET_HITBOX_SIZE%20%3D%20Vector3.new(15%2C%2015%2C%2015)%0Alocal%20activeNPCs%20%3D%20%7B%7D%20%20%20%20%20%20%0Alocal%20trackedParts%20%3D%20%7B%7D%20%20%20%20%0Alocal%20originalSizes%20%3D%20%7B%7D%20%20%20%0Alocal%20wallConnections%20%3D%20%7B%7D%20%0A%0Alocal%20wallEnabled%20%3D%20false%20%20%20%20%20%20%20%0Alocal%20silentEnabled%20%3D%20false%20%20%20%20%20%0Alocal%20showHitbox%20%3D%20false%20%20%20%20%20%20%20%20%0Alocal%20fullBrightEnabled%20%3D%20false%20%0Alocal%20isUnloaded%20%3D%20false%20%20%20%20%20%20%20%20%0Alocal%20fastScanEnabled%20%3D%20false%20%20%20%0Alocal%20patchOptions%20%3D%20%7B%20recoil%20%3D%20false%2C%20firemodes%20%3D%20false%20%7D%0A%0Alocal%20maleColor%20%3D%20Color3.fromRGB(0%2C%20255%2C%200)%0Alocal%20zombieColor%20%3D%20Color3.fromRGB(255%2C%200%2C%200)%0A%0Alocal%20originalLighting%20%3D%20%7B%0A%20%20%20%20Brightness%20%3D%20lighting.Brightness%2C%0A%20%20%20%20ClockTime%20%3D%20lighting.ClockTime%2C%0A%20%20%20%20FogEnd%20%3D%20lighting.FogEnd%2C%0A%20%20%20%20GlobalShadows%20%3D%20lighting.GlobalShadows%2C%0A%20%20%20%20Ambient%20%3D%20lighting.Ambient%0A%7D%0A%0Alocal%20function%20getRootPart(model)%0A%20%20%20%20return%20model%3AFindFirstChild(%22Root%22)%20or%20model%3AFindFirstChild(%22HumanoidRootPart%22)%20or%20model%3AFindFirstChild(%22UpperTorso%22)%0Aend%0A%0Alocal%20function%20isValidNPC(model)%0A%20%20%20%20local%20name%20%3D%20model.Name%3Alower()%0A%20%20%20%20local%20isTargetName%20%3D%20(name%20%3D%3D%20%22male%22%20or%20name%20%3D%3D%20%22zombie%22%20or%20name%20%3D%3D%20%22zombies%22)%0A%20%20%20%20if%20name%20%3D%3D%20%22male%22%20then%0A%20%20%20%20%20%20%20%20local%20hasAI%20%3D%20false%0A%20%20%20%20%20%20%20%20for%20_%2C%20c%20in%20ipairs(model%3AGetChildren())%20do%0A%20%20%20%20%20%20%20%20%20%20%20%20if%20type(c.Name)%20%3D%3D%20%22string%22%20and%20c.Name%3Asub(1%2C%203)%20%3D%3D%20%22AI_%22%20then%20hasAI%20%3D%20true%20break%20end%0A%20%20%20%20%20%20%20%20end%0A%20%20%20%20%20%20%20%20return%20hasAI%0A%20%20%20%20end%0A%20%20%20%20return%20isTargetName%0Aend%0A%0Alocal%20function%20createBoxForPart(part)%0A%20%20%20%20if%20not%20part%20or%20part%3AFindFirstChild(%22Wall_Box%22)%20then%20return%20end%0A%20%20%20%20local%20sphere%20%3D%20Instance.new(%22SphereHandleAdornment%22)%0A%20%20%20%20sphere.Name%20%3D%20%22Wall_Box%22%0A%20%20%20%20sphere.Radius%20%3D%201.2%0A%20%20%20%20sphere.Adornee%20%3D%20part%0A%20%20%20%20sphere.AlwaysOnTop%20%3D%20true%20%0A%20%20%20%20sphere.ZIndex%20%3D%2010%0A%20%20%20%20sphere.Transparency%20%3D%200.1%0A%20%20%20%20sphere.Parent%20%3D%20part%0A%20%20%20%20trackedParts%5Bpart%5D%20%3D%20true%0Aend%0A%0Alocal%20function%20destroyAllBoxes()%0A%20%20%20%20for%20part%2C%20_%20in%20pairs(trackedParts)%20do%0A%20%20%20%20%20%20%20%20if%20part%20and%20part%3AFindFirstChild(%22Wall_Box%22)%20then%20pcall(function()%20part.Wall_Box%3ADestroy()%20end)%20end%0A%20%20%20%20end%0A%20%20%20%20trackedParts%20%3D%20%7B%7D%0Aend%0A%0Alocal%20function%20applySilentHitbox(model%2C%20root)%0A%20%20%20%20if%20not%20originalSizes%5Bmodel%5D%20then%20originalSizes%5Bmodel%5D%20%3D%20root.Size%20end%0A%20%20%20%20root.Size%20%3D%20TARGET_HITBOX_SIZE%0A%20%20%20%20root.Transparency%20%3D%20showHitbox%20and%200.85%20or%201%20%0A%20%20%20%20root.Color%20%3D%20Color3.fromRGB(255%2C%200%2C%200)%0A%20%20%20%20root.CanCollide%20%3D%20true%0Aend%0A%0Alocal%20function%20restoreOriginalSize(model)%0A%20%20%20%20local%20root%20%3D%20getRootPart(model)%0A%20%20%20%20if%20root%20and%20originalSizes%5Bmodel%5D%20then%0A%20%20%20%20%20%20%20%20root.Size%20%3D%20originalSizes%5Bmodel%5D%0A%20%20%20%20%20%20%20%20root.Transparency%20%3D%201%0A%20%20%20%20%20%20%20%20root.CanCollide%20%3D%20false%0A%20%20%20%20end%0A%20%20%20%20originalSizes%5Bmodel%5D%20%3D%20nil%0Aend%0A%0Alocal%20function%20addNPC(model)%0A%20%20%20%20if%20activeNPCs%5Bmodel%5D%20or%20not%20isValidNPC(model)%20then%20return%20end%0A%20%20%20%20local%20head%20%3D%20model%3AFindFirstChild(%22Head%22)%0A%20%20%20%20local%20root%20%3D%20getRootPart(model)%0A%20%20%20%20if%20not%20(head%20or%20root)%20then%20return%20end%0A%20%20%20%20activeNPCs%5Bmodel%5D%20%3D%20%7B%20head%20%3D%20head%20or%20root%2C%20root%20%3D%20root%20%7D%0A%20%20%20%20if%20wallEnabled%20then%20createBoxForPart(head%20or%20root)%20end%0Aend%0A%0Alocal%20function%20patchWeapons(options)%0A%20%20%20%20local%20weaponsFolder%20%3D%20RS%3AFindFirstChild(%22Shared%22)%0A%20%20%20%20%20%20%20%20and%20RS.Shared%3AFindFirstChild(%22Configs%22)%0A%20%20%20%20%20%20%20%20and%20RS.Shared.Configs%3AFindFirstChild(%22Weapon%22)%0A%20%20%20%20%20%20%20%20and%20RS.Shared.Configs.Weapon%3AFindFirstChild(%22Weapons_Player%22)%0A%20%20%20%20if%20not%20weaponsFolder%20then%20return%20end%0A%20%20%20%20for%20_%2C%20platform%20in%20pairs(weaponsFolder%3AGetChildren())%20do%0A%20%20%20%20%20%20%20%20if%20platform.Name%3Amatch(%22%5EPlatform_%22)%20then%0A%20%20%20%20%20%20%20%20%20%20%20%20for%20_%2C%20weapon%20in%20pairs(platform%3AGetChildren())%20do%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20for%20_%2C%20child%20in%20pairs(weapon%3AGetChildren())%20do%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20if%20child%3AIsA(%22ModuleScript%22)%20and%20child.Name%3Amatch(%22%5EReceiver%25.%22)%20then%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20local%20success%2C%20receiver%20%3D%20pcall(require%2C%20child)%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20if%20success%20and%20receiver%20and%20receiver.Config%20and%20receiver.Config.Tune%20then%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20local%20tune%20%3D%20receiver.Config.Tune%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20if%20options.recoil%20then%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20tune.Recoil_X%20%3D%200%20tune.Recoil_Z%20%3D%200%20tune.RecoilForce_Tap%20%3D%200%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20tune.RecoilForce_Impulse%20%3D%200%20tune.Recoil_Range%20%3D%20Vector2.zero%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20tune.Recoil_Camera%20%3D%200%20tune.RecoilAccelDamp_Crouch%20%3D%20Vector3.new(1%2C%201%2C%201)%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20tune.RecoilAccelDamp_Prone%20%3D%20Vector3.new(1%2C%201%2C%201)%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20end%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20if%20options.firemodes%20then%20tune.Firemodes%20%3D%20%7B3%2C%202%2C%201%2C%200%7D%20end%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20end%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20end%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20end%0A%20%20%20%20%20%20%20%20%20%20%20%20end%0A%20%20%20%20%20%20%20%20end%0A%20%20%20%20end%0Aend%0A%0A--%20%5BLIBRARY%20CONFIG%5D%0Alocal%20function%20CleanupOldUI()%0A%20%20%20%20local%20oldUI%20%3D%20(gethui%20and%20gethui()%3AFindFirstChild(%22TOKAIHUB%22))%20or%20game.CoreGui%3AFindFirstChild(%22TOKAIHUB%22)%0A%20%20%20%20if%20oldUI%20then%20oldUI%3ADestroy()%20end%0Aend%0ACleanupOldUI()%0A%0Alocal%20BackgroundList%20%3D%20%7B%0A%20%20%20%20%22rbxthumb%3A%2F%2Ftype%3DAsset%26id%3D13605715274%26w%3D420%26h%3D420%22%2C%0A%20%20%20%20%22rbxthumb%3A%2F%2Ftype%3DAsset%26id%3D10935179737%26w%3D420%26h%3D420%22%2C%0A%20%20%20%20%22rbxthumb%3A%2F%2Ftype%3DAsset%26id%3D97182163526089%26w%3D420%26h%3D420%22%2C%0A%20%20%20%20%22rbxthumb%3A%2F%2Ftype%3DAsset%26id%3D114016973837508%26w%3D420%26h%3D420%22%2C%0A%20%20%20%20%22rbxthumb%3A%2F%2Ftype%3DAsset%26id%3D101612750444882%26w%3D420%26h%3D420%22%2C%0A%20%20%20%20%22rbxthumb%3A%2F%2Ftype%3DAsset%26id%3D2014971747%26w%3D420%26h%3D420%22%2C%0A%20%20%20%20%22rbxthumb%3A%2F%2Ftype%3DAsset%26id%3D101959737652480%26w%3D420%26h%3D420%22%2C%0A%20%20%20%20%22rbxthumb%3A%2F%2Ftype%3DAsset%26id%3D110802555840064%26w%3D420%26h%3D420%22%2C%0A%20%20%20%20%22rbxthumb%3A%2F%2Ftype%3DAsset%26id%3D598493435%26w%3D420%26h%3D420%22%2C%0A%20%20%20%20%22rbxthumb%3A%2F%2Ftype%3DAsset%26id%3D10007194277%26w%3D420%26h%3D420%22%0A%7D%0Aif%20not%20_G.BackgroundState%20then%20_G.BackgroundState%20%3D%20%7B%20CurrentIndex%20%3D%201%2C%20LastUpdate%20%3D%20tick()%20%7D%20end%0A%0Alocal%20function%20PlayCustomClick()%0A%20%20%20%20local%20sound%20%3D%20Instance.new(%22Sound%22)%0A%20%20%20%20sound.SoundId%20%3D%20%22rbxassetid%3A%2F%2F126347354635406%22%0A%20%20%20%20sound.Volume%20%3D%200.8%0A%20%20%20%20sound.Parent%20%3D%20SoundService%0A%20%20%20%20sound%3APlay()%0A%20%20%20%20sound.Ended%3AConnect(function()%20sound%3ADestroy()%20end)%0Aend%0A%0Alocal%20Library%20%3D%20%7B%7D%0Afunction%20Library%3ACreateWindow()%0A%20%20%20%20local%20screenGui%20%3D%20Instance.new(%22ScreenGui%22)%0A%20%20%20%20screenGui.Name%20%3D%20%22TOKAIHUB%22%0A%20%20%20%20screenGui.Parent%20%3D%20(gethui%20and%20gethui())%20or%20game.CoreGui%0A%20%20%20%20screenGui.ResetOnSpawn%20%3D%20false%0A%20%20%20%20local%20mainSize%20%3D%20UDim2.new(0%2C%20520%2C%200%2C%20320)%0A%20%20%20%20local%20logoID%20%3D%20%22rbxthumb%3A%2F%2Ftype%3DAsset%26id%3D99217897221957%26w%3D420%26h%3D420%22%0A%0A%20%20%20%20local%20openBtn%20%3D%20Instance.new(%22ImageButton%22%2C%20screenGui)%0A%20%20%20%20openBtn.Name%20%3D%20%22OpenButton%22%0A%20%20%20%20openBtn.Size%20%3D%20UDim2.new(0%2C%2055%2C%200%2C%2055)%0A%20%20%20%20openBtn.Position%20%3D%20UDim2.new(0%2C%2020%2C%200.5%2C%20-27)%0A%20%20%20%20openBtn.Visible%20%3D%20false%0A%20%20%20%20openBtn.BackgroundColor3%20%3D%20Color3.fromRGB(20%2C%2020%2C%2020)%0A%20%20%20%20openBtn.Image%20%3D%20logoID%0A%20%20%20%20openBtn.ZIndex%20%3D%20100%0A%20%20%20%20Instance.new(%22UICorner%22%2C%20openBtn).CornerRadius%20%3D%20UDim.new(1%2C%200)%0A%20%20%20%20local%20openStroke%20%3D%20Instance.new(%22UIStroke%22%2C%20openBtn)%0A%20%20%20%20openStroke.Thickness%20%3D%202%0A%0A%20%20%20%20local%20main%20%3D%20Instance.new(%22Frame%22%2C%20screenGui)%0A%20%20%20%20main.Name%20%3D%20%22MainFrame%22%0A%20%20%20%20main.Size%20%3D%20UDim2.new(0%2C%200%2C%200%2C%200)%0A%20%20%20%20main.Position%20%3D%20UDim2.new(0.5%2C%200%2C%200.5%2C%200)%0A%20%20%20%20main.BackgroundColor3%20%3D%20Color3.fromRGB(15%2C%2015%2C%2015)%0A%20%20%20%20main.BackgroundTransparency%20%3D%200.2%0A%20%20%20%20main.AnchorPoint%20%3D%20Vector2.new(0.5%2C%200.5)%0A%20%20%20%20main.ClipsDescendants%20%3D%20true%0A%20%20%20%20main.Active%20%3D%20true%0A%20%20%20%20Instance.new(%22UICorner%22%2C%20main).CornerRadius%20%3D%20UDim.new(0%2C%2010)%0A%20%20%20%20local%20mainStroke%20%3D%20Instance.new(%22UIStroke%22%2C%20main)%0A%20%20%20%20mainStroke.Thickness%20%3D%202%0A%0A%20%20%20%20local%20mainBg%20%3D%20Instance.new(%22ImageLabel%22%2C%20main)%0A%20%20%20%20mainBg.Name%20%3D%20%22Background%22%0A%20%20%20%20mainBg.Size%20%3D%20UDim2.new(1%2C%200%2C%201%2C%200)%0A%20%20%20%20mainBg.BackgroundTransparency%20%3D%201%0A%20%20%20%20mainBg.Image%20%3D%20BackgroundList%5B_G.BackgroundState.CurrentIndex%5D%0A%20%20%20%20mainBg.ImageTransparency%20%3D%200.4%0A%20%20%20%20mainBg.ScaleType%20%3D%20Enum.ScaleType.Crop%0A%20%20%20%20mainBg.ZIndex%20%3D%201%0A%0A%20%20%20%20TweenService%3ACreate(main%2C%20TweenInfo.new(0.5%2C%20Enum.EasingStyle.Back%2C%20Enum.EasingDirection.Out)%2C%20%7BSize%20%3D%20mainSize%7D)%3APlay()%0A%0A%20%20%20%20task.spawn(function()%0A%20%20%20%20%20%20%20%20while%20task.wait(1)%20do%0A%20%20%20%20%20%20%20%20%20%20%20%20if%20not%20screenGui.Parent%20then%20break%20end%0A%20%20%20%20%20%20%20%20%20%20%20%20if%20tick()%20-%20_G.BackgroundState.LastUpdate%20%3E%3D%20300%20then%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20_G.BackgroundState.LastUpdate%20%3D%20tick()%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20_G.BackgroundState.CurrentIndex%20%3D%20(_G.BackgroundState.CurrentIndex%20%25%20%23BackgroundList)%20%2B%201%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20local%20tw%20%3D%20TweenService%3ACreate(mainBg%2C%20TweenInfo.new(1.5)%2C%20%7BImageTransparency%20%3D%201%7D)%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20tw%3APlay()%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20tw.Completed%3AWait()%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20mainBg.Image%20%3D%20BackgroundList%5B_G.BackgroundState.CurrentIndex%5D%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20TweenService%3ACreate(mainBg%2C%20TweenInfo.new(1.5)%2C%20%7BImageTransparency%20%3D%200.4%7D)%3APlay()%0A%20%20%20%20%20%20%20%20%20%20%20%20end%0A%20%20%20%20%20%20%20%20end%0A%20%20%20%20end)%0A%0A%20%20%20%20local%20sidebar%20%3D%20Instance.new(%22Frame%22%2C%20main)%0A%20%20%20%20sidebar.Name%20%3D%20%22Sidebar%22%0A%20%20%20%20sidebar.Size%20%3D%20UDim2.new(0%2C%20150%2C%201%2C%200)%0A%20%20%20%20sidebar.BackgroundColor3%20%3D%20Color3.fromRGB(0%2C%200%2C%200)%0A%20%20%20%20sidebar.BackgroundTransparency%20%3D%200.4%0A%20%20%20%20sidebar.ZIndex%20%3D%2010%0A%20%20%20%20Instance.new(%22UICorner%22%2C%20sidebar).CornerRadius%20%3D%20UDim.new(0%2C%2010)%0A%0A%20%20%20%20local%20header%20%3D%20Instance.new(%22Frame%22%2C%20sidebar)%0A%20%20%20%20header.Name%20%3D%20%22Header%22%0A%20%20%20%20header.Size%20%3D%20UDim2.new(1%2C%200%2C%200%2C%2060)%0A%20%20%20%20header.BackgroundTransparency%20%3D%201%0A%20%20%20%20header.ZIndex%20%3D%2011%0A%0A%20%20%20%20local%20logoImg%20%3D%20Instance.new(%22ImageLabel%22%2C%20header)%0A%20%20%20%20logoImg.Size%20%3D%20UDim2.new(0%2C%2035%2C%200%2C%2035)%0A%20%20%20%20logoImg.Position%20%3D%20UDim2.new(0%2C%2012%2C%200.5%2C%20-17)%0A%20%20%20%20logoImg.BackgroundTransparency%20%3D%201%0A%20%20%20%20logoImg.Image%20%3D%20logoID%0A%20%20%20%20logoImg.ZIndex%20%3D%2012%0A%20%20%20%20Instance.new(%22UICorner%22%2C%20logoImg).CornerRadius%20%3D%20UDim.new(1%2C%200)%0A%20%20%20%20local%20logoStroke%20%3D%20Instance.new(%22UIStroke%22%2C%20logoImg)%0A%20%20%20%20logoStroke.Color%20%3D%20Color3.fromRGB(255%2C%20255%2C%20255)%0A%20%20%20%20logoStroke.Thickness%20%3D%201.5%0A%0A%20%20%20%20local%20titleText%20%3D%20Instance.new(%22TextLabel%22%2C%20header)%0A%20%20%20%20titleText.Size%20%3D%20UDim2.new(1%2C%20-55%2C%201%2C%200)%0A%20%20%20%20titleText.Position%20%3D%20UDim2.new(0%2C%2052%2C%200%2C%200)%0A%20%20%20%20titleText.BackgroundTransparency%20%3D%201%0A%20%20%20%20titleText.Text%20%3D%20%22TOKAI%20HUB%22%0A%20%20%20%20titleText.TextColor3%20%3D%20Color3.fromRGB(255%2C%20255%2C%20255)%0A%20%20%20%20titleText.Font%20%3D%20Enum.Font.GothamBold%0A%20%20%20%20titleText.TextSize%20%3D%2013%0A%20%20%20%20titleText.TextXAlignment%20%3D%20Enum.TextXAlignment.Left%0A%20%20%20%20titleText.ZIndex%20%3D%2012%0A%0A%20%20%20%20local%20pages%20%3D%20Instance.new(%22Frame%22%2C%20main)%0A%20%20%20%20pages.Name%20%3D%20%22Pages%22%0A%20%20%20%20pages.Size%20%3D%20UDim2.new(1%2C%20-170%2C%201%2C%20-20)%0A%20%20%20%20pages.Position%20%3D%20UDim2.new(0%2C%20160%2C%200%2C%2010)%0A%20%20%20%20pages.BackgroundTransparency%20%3D%201%0A%20%20%20%20pages.ZIndex%20%3D%2020%0A%0A%20%20%20%20local%20tabList%20%3D%20Instance.new(%22ScrollingFrame%22%2C%20sidebar)%0A%20%20%20%20tabList.Name%20%3D%20%22TabList%22%0A%20%20%20%20tabList.Size%20%3D%20UDim2.new(1%2C%200%2C%201%2C%20-70)%0A%20%20%20%20tabList.Position%20%3D%20UDim2.new(0%2C%200%2C%200%2C%2065)%0A%20%20%20%20tabList.BackgroundTransparency%20%3D%201%0A%20%20%20%20tabList.ScrollBarThickness%20%3D%200%0A%20%20%20%20tabList.ZIndex%20%3D%2011%0A%20%20%20%20local%20listLayout%20%3D%20Instance.new(%22UIListLayout%22%2C%20tabList)%0A%20%20%20%20listLayout.HorizontalAlignment%20%3D%20Enum.HorizontalAlignment.Center%0A%20%20%20%20listLayout.Padding%20%3D%20UDim.new(0%2C%206)%0A%0A%20%20%20%20local%20currentOrbit%20%3D%20nil%0A%20%20%20%20local%20function%20CreateOrbitEffect(targetBtn)%0A%20%20%20%20%20%20%20%20if%20currentOrbit%20then%20currentOrbit%3ADestroy()%20end%0A%20%20%20%20%20%20%20%20local%20orbit%20%3D%20Instance.new(%22Frame%22)%0A%20%20%20%20%20%20%20%20orbit.Size%20%3D%20UDim2.new(0%2C%205%2C%200%2C%205)%0A%20%20%20%20%20%20%20%20orbit.BackgroundColor3%20%3D%20Color3.fromRGB(255%2C%20245%2C%20150)%0A%20%20%20%20%20%20%20%20orbit.BorderSizePixel%20%3D%200%0A%20%20%20%20%20%20%20%20orbit.ZIndex%20%3D%2050%0A%20%20%20%20%20%20%20%20orbit.Parent%20%3D%20targetBtn%0A%20%20%20%20%20%20%20%20Instance.new(%22UICorner%22%2C%20orbit).CornerRadius%20%3D%20UDim.new(1%2C%200)%0A%20%20%20%20%20%20%20%20local%20glow%20%3D%20Instance.new(%22ImageLabel%22%2C%20orbit)%0A%20%20%20%20%20%20%20%20glow.Size%20%3D%20UDim2.new(4%2C%200%2C%204%2C%200)%3B%20glow.Position%20%3D%20UDim2.new(-1.5%2C%200%2C%20-1.5%2C%200)%0A%20%20%20%20%20%20%20%20glow.BackgroundTransparency%20%3D%201%3B%20glow.Image%20%3D%20%22rbxassetid%3A%2F%2F6015667101%22%3B%20glow.ImageColor3%20%3D%20Color3.fromRGB(255%2C%20240%2C%20100)%3B%20glow.ZIndex%20%3D%2049%0A%20%20%20%20%20%20%20%20currentOrbit%20%3D%20orbit%0A%20%20%20%20%20%20%20%20task.spawn(function()%0A%20%20%20%20%20%20%20%20%20%20%20%20local%20a%20%3D%200%0A%20%20%20%20%20%20%20%20%20%20%20%20while%20orbit%20and%20orbit.Parent%20%3D%3D%20targetBtn%20do%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20a%20%3D%20a%20%2B%205%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20local%20r%20%3D%20math.rad(a)%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20orbit.Position%20%3D%20UDim2.new(0.5%2C%20math.cos(r)*(targetBtn.AbsoluteSize.X%2F2%2B3)%2C%200.5%2C%20math.sin(r)*(targetBtn.AbsoluteSize.Y%2F2%2B3))%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20RunService.RenderStepped%3AWait()%0A%20%20%20%20%20%20%20%20%20%20%20%20end%0A%20%20%20%20%20%20%20%20end)%0A%20%20%20%20end%0A%0A%20%20%20%20local%20firstTab%20%3D%20true%0A%20%20%20%20function%20Library%3ACreateTab(name)%0A%20%20%20%20%20%20%20%20local%20page%20%3D%20Instance.new(%22ScrollingFrame%22%2C%20pages)%0A%20%20%20%20%20%20%20%20page.Name%20%3D%20name%20..%20%22Page%22%0A%20%20%20%20%20%20%20%20page.Size%20%3D%20UDim2.new(1%2C%200%2C%201%2C%200)%0A%20%20%20%20%20%20%20%20page.BackgroundTransparency%20%3D%201%0A%20%20%20%20%20%20%20%20page.Visible%20%3D%20false%0A%20%20%20%20%20%20%20%20page.ScrollBarThickness%20%3D%202%0A%20%20%20%20%20%20%20%20page.ZIndex%20%3D%2021%0A%20%20%20%20%20%20%20%20local%20pageLayout%20%3D%20Instance.new(%22UIListLayout%22%2C%20page)%0A%20%20%20%20%20%20%20%20pageLayout.Padding%20%3D%20UDim.new(0%2C%2010)%0A%20%20%20%20%20%20%20%20pageLayout.HorizontalAlignment%20%3D%20Enum.HorizontalAlignment.Center%0A%0A%20%20%20%20%20%20%20%20local%20tabBtn%20%3D%20Instance.new(%22TextButton%22%2C%20tabList)%0A%20%20%20%20%20%20%20%20tabBtn.Size%20%3D%20UDim2.new(0%2C%20130%2C%200%2C%2036)%0A%20%20%20%20%20%20%20%20tabBtn.BackgroundColor3%20%3D%20Color3.fromRGB(45%2C%2045%2C%2045)%0A%20%20%20%20%20%20%20%20tabBtn.BackgroundTransparency%20%3D%200.5%0A%20%20%20%20%20%20%20%20tabBtn.Text%20%3D%20name%0A%20%20%20%20%20%20%20%20tabBtn.TextColor3%20%3D%20Color3.fromRGB(180%2C%20180%2C%20180)%0A%20%20%20%20%20%20%20%20tabBtn.Font%20%3D%20Enum.Font.GothamSemibold%0A%20%20%20%20%20%20%20%20tabBtn.TextSize%20%3D%2013%0A%20%20%20%20%20%20%20%20tabBtn.ZIndex%20%3D%201
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local SoundService = game:GetService("SoundService")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RS = game:GetService("ReplicatedStorage")
+local lighting = game:GetService("Lighting")
+
+-- [ORIGINAL LOGIC - DO NOT TOUCH]
+local localPlayer = Players.LocalPlayer
+local camera = Workspace.CurrentCamera
+local TARGET_HITBOX_SIZE = Vector3.new(15, 15, 15)
+local activeNPCs = {}      
+local trackedParts = {}    
+local originalSizes = {}   
+local wallConnections = {} 
+
+local wallEnabled = false       
+local silentEnabled = false     
+local showHitbox = false        
+local fullBrightEnabled = false 
+local isUnloaded = false        
+local fastScanEnabled = false   
+local patchOptions = { recoil = false, firemodes = false }
+
+local maleColor = Color3.fromRGB(0, 255, 0)
+local zombieColor = Color3.fromRGB(255, 0, 0)
+
+local originalLighting = {
+    Brightness = lighting.Brightness,
+    ClockTime = lighting.ClockTime,
+    FogEnd = lighting.FogEnd,
+    GlobalShadows = lighting.GlobalShadows,
+    Ambient = lighting.Ambient
+}
+
+local function getRootPart(model)
+    return model:FindFirstChild("Root") or model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("UpperTorso")
+end
+
+local function isValidNPC(model)
+    local name = model.Name:lower()
+    local isTargetName = (name == "male" or name == "zombie" or name == "zombies")
+    if name == "male" then
+        local hasAI = false
+        for _, c in ipairs(model:GetChildren()) do
+            if type(c.Name) == "string" and c.Name:sub(1, 3) == "AI_" then hasAI = true break end
+        end
+        return hasAI
+    end
+    return isTargetName
+end
+
+local function createBoxForPart(part)
+    if not part or part:FindFirstChild("Wall_Box") then return end
+    local sphere = Instance.new("SphereHandleAdornment")
+    sphere.Name = "Wall_Box"
+    sphere.Radius = 1.2
+    sphere.Adornee = part
+    sphere.AlwaysOnTop = true 
+    sphere.ZIndex = 10
+    sphere.Transparency = 0.1
+    sphere.Parent = part
+    trackedParts[part] = true
+end
+
+local function destroyAllBoxes()
+    for part, _ in pairs(trackedParts) do
+        if part and part:FindFirstChild("Wall_Box") then pcall(function() part.Wall_Box:Destroy() end) end
+    end
+    trackedParts = {}
+end
+
+local function applySilentHitbox(model, root)
+    if not originalSizes[model] then originalSizes[model] = root.Size end
+    root.Size = TARGET_HITBOX_SIZE
+    root.Transparency = showHitbox and 0.85 or 1 
+    root.Color = Color3.fromRGB(255, 0, 0)
+    root.CanCollide = true
+end
+
+local function restoreOriginalSize(model)
+    local root = getRootPart(model)
+    if root and originalSizes[model] then
+        root.Size = originalSizes[model]
+        root.Transparency = 1
+        root.CanCollide = false
+    end
+    originalSizes[model] = nil
+end
+
+local function addNPC(model)
+    if activeNPCs[model] or not isValidNPC(model) then return end
+    local head = model:FindFirstChild("Head")
+    local root = getRootPart(model)
+    if not (head or root) then return end
+    activeNPCs[model] = { head = head or root, root = root }
+    if wallEnabled then createBoxForPart(head or root) end
+end
+
+local function patchWeapons(options)
+    local weaponsFolder = RS:FindFirstChild("Shared")
+        and RS.Shared:FindFirstChild("Configs")
+        and RS.Shared.Configs:FindFirstChild("Weapon")
+        and RS.Shared.Configs.Weapon:FindFirstChild("Weapons_Player")
+    if not weaponsFolder then return end
+    for _, platform in pairs(weaponsFolder:GetChildren()) do
+        if platform.Name:match("^Platform_") then
+            for _, weapon in pairs(platform:GetChildren()) do
+                for _, child in pairs(weapon:GetChildren()) do
+                    if child:IsA("ModuleScript") and child.Name:match("^Receiver%.") then
+                        local success, receiver = pcall(require, child)
+                        if success and receiver and receiver.Config and receiver.Config.Tune then
+                            local tune = receiver.Config.Tune
+                            if options.recoil then
+                                tune.Recoil_X = 0 tune.Recoil_Z = 0 tune.RecoilForce_Tap = 0
+                                tune.RecoilForce_Impulse = 0 tune.Recoil_Range = Vector2.zero
+                                tune.Recoil_Camera = 0 tune.RecoilAccelDamp_Crouch = Vector3.new(1, 1, 1)
+                                tune.RecoilAccelDamp_Prone = Vector3.new(1, 1, 1)
+                            end
+                            if options.firemodes then tune.Firemodes = {3, 2, 1, 0} end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- [LIBRARY CONFIG]
+local function CleanupOldUI()
+    local oldUI = (gethui and gethui():FindFirstChild("TOKAIHUB")) or game.CoreGui:FindFirstChild("TOKAIHUB")
+    if oldUI then oldUI:Destroy() end
+end
+CleanupOldUI()
+
+local BackgroundList = {
+    "rbxthumb://type=Asset&id=13605715274&w=420&h=420",
+    "rbxthumb://type=Asset&id=10935179737&w=420&h=420",
+    "rbxthumb://type=Asset&id=97182163526089&w=420&h=420",
+    "rbxthumb://type=Asset&id=114016973837508&w=420&h=420",
+    "rbxthumb://type=Asset&id=101612750444882&w=420&h=420",
+    "rbxthumb://type=Asset&id=2014971747&w=420&h=420",
+    "rbxthumb://type=Asset&id=101959737652480&w=420&h=420",
+    "rbxthumb://type=Asset&id=110802555840064&w=420&h=420",
+    "rbxthumb://type=Asset&id=598493435&w=420&h=420",
+    "rbxthumb://type=Asset&id=10007194277&w=420&h=420"
+}
+if not _G.BackgroundState then _G.BackgroundState = { CurrentIndex = 1, LastUpdate = tick() } end
+
+local function PlayCustomClick()
+    local sound = Instance.new("Sound")
+    sound.SoundId = "rbxassetid://126347354635406"
+    sound.Volume = 0.8
+    sound.Parent = SoundService
+    sound:Play()
+    sound.Ended:Connect(function() sound:Destroy() end)
+end
+
+local Library = {}
+function Library:CreateWindow()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "TOKAIHUB"
+    screenGui.Parent = (gethui and gethui()) or game.CoreGui
+    screenGui.ResetOnSpawn = false
+    local mainSize = UDim2.new(0, 520, 0, 320)
+    local logoID = "rbxthumb://type=Asset&id=99217897221957&w=420&h=420"
+
+    local openBtn = Instance.new("ImageButton", screenGui)
+    openBtn.Name = "OpenButton"
+    openBtn.Size = UDim2.new(0, 55, 0, 55)
+    openBtn.Position = UDim2.new(0, 20, 0.5, -27)
+    openBtn.Visible = false
+    openBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    openBtn.Image = logoID
+    openBtn.ZIndex = 100
+    Instance.new("UICorner", openBtn).CornerRadius = UDim.new(1, 0)
+    local openStroke = Instance.new("UIStroke", openBtn)
+    openStroke.Thickness = 2
+
+    local main = Instance.new("Frame", screenGui)
+    main.Name = "MainFrame"
+    main.Size = UDim2.new(0, 0, 0, 0)
+    main.Position = UDim2.new(0.5, 0, 0.5, 0)
+    main.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+    main.BackgroundTransparency = 0.2
+    main.AnchorPoint = Vector2.new(0.5, 0.5)
+    main.ClipsDescendants = true
+    main.Active = true
+    Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
+    local mainStroke = Instance.new("UIStroke", main)
+    mainStroke.Thickness = 2
+
+    local mainBg = Instance.new("ImageLabel", main)
+    mainBg.Name = "Background"
+    mainBg.Size = UDim2.new(1, 0, 1, 0)
+    mainBg.BackgroundTransparency = 1
+    mainBg.Image = BackgroundList[_G.BackgroundState.CurrentIndex]
+    mainBg.ImageTransparency = 0.4
+    mainBg.ScaleType = Enum.ScaleType.Crop
+    mainBg.ZIndex = 1
+
+    TweenService:Create(main, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = mainSize}):Play()
+
+    task.spawn(function()
+        while task.wait(1) do
+            if not screenGui.Parent then break end
+            if tick() - _G.BackgroundState.LastUpdate >= 300 then
+                _G.BackgroundState.LastUpdate = tick()
+                _G.BackgroundState.CurrentIndex = (_G.BackgroundState.CurrentIndex % #BackgroundList) + 1
+                local tw = TweenService:Create(mainBg, TweenInfo.new(1.5), {ImageTransparency = 1})
+                tw:Play()
+                tw.Completed:Wait()
+                mainBg.Image = BackgroundList[_G.BackgroundState.CurrentIndex]
+                TweenService:Create(mainBg, TweenInfo.new(1.5), {ImageTransparency = 0.4}):Play()
+            end
+        end
+    end)
+
+    local sidebar = Instance.new("Frame", main)
+    sidebar.Name = "Sidebar"
+    sidebar.Size = UDim2.new(0, 150, 1, 0)
+    sidebar.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    sidebar.BackgroundTransparency = 0.4
+    sidebar.ZIndex = 10
+    Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 10)
+
+    local header = Instance.new("Frame", sidebar)
+    header.Name = "Header"
+    header.Size = UDim2.new(1, 0, 0, 60)
+    header.BackgroundTransparency = 1
+    header.ZIndex = 11
+
+    local logoImg = Instance.new("ImageLabel", header)
+    logoImg.Size = UDim2.new(0, 35, 0, 35)
+    logoImg.Position = UDim2.new(0, 12, 0.5, -17)
+    logoImg.BackgroundTransparency = 1
+    logoImg.Image = logoID
+    logoImg.ZIndex = 12
+    Instance.new("UICorner", logoImg).CornerRadius = UDim.new(1, 0)
+    local logoStroke = Instance.new("UIStroke", logoImg)
+    logoStroke.Color = Color3.fromRGB(255, 255, 255)
+    logoStroke.Thickness = 1.5
+
+    local titleText = Instance.new("TextLabel", header)
+    titleText.Size = UDim2.new(1, -55, 1, 0)
+    titleText.Position = UDim2.new(0, 52, 0, 0)
+    titleText.BackgroundTransparency = 1
+    titleText.Text = "TOKAI HUB"
+    titleText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleText.Font = Enum.Font.GothamBold
+    titleText.TextSize = 13
+    titleText.TextXAlignment = Enum.TextXAlignment.Left
+    titleText.ZIndex = 12
+
+    local pages = Instance.new("Frame", main)
+    pages.Name = "Pages"
+    pages.Size = UDim2.new(1, -170, 1, -20)
+    pages.Position = UDim2.new(0, 160, 0, 10)
+    pages.BackgroundTransparency = 1
+    pages.ZIndex = 20
+
+    local tabList = Instance.new("ScrollingFrame", sidebar)
+    tabList.Name = "TabList"
+    tabList.Size = UDim2.new(1, 0, 1, -70)
+    tabList.Position = UDim2.new(0, 0, 0, 65)
+    tabList.BackgroundTransparency = 1
+    tabList.ScrollBarThickness = 0
+    tabList.ZIndex = 11
+    local listLayout = Instance.new("UIListLayout", tabList)
+    listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    listLayout.Padding = UDim.new(0, 6)
+
+    local currentOrbit = nil
+    local function CreateOrbitEffect(targetBtn)
+        if currentOrbit then currentOrbit:Destroy() end
+        local orbit = Instance.new("Frame")
+        orbit.Size = UDim2.new(0, 5, 0, 5)
+        orbit.BackgroundColor3 = Color3.fromRGB(255, 245, 150)
+        orbit.BorderSizePixel = 0
+        orbit.ZIndex = 50
+        orbit.Parent = targetBtn
+        Instance.new("UICorner", orbit).CornerRadius = UDim.new(1, 0)
+        local glow = Instance.new("ImageLabel", orbit)
+        glow.Size = UDim2.new(4, 0, 4, 0); glow.Position = UDim2.new(-1.5, 0, -1.5, 0)
+        glow.BackgroundTransparency = 1; glow.Image = "rbxassetid://6015667101"; glow.ImageColor3 = Color3.fromRGB(255, 240, 100); glow.ZIndex = 49
+        currentOrbit = orbit
+        task.spawn(function()
+            local a = 0
+            while orbit and orbit.Parent == targetBtn do
+                a = a + 5
+                local r = math.rad(a)
+                orbit.Position = UDim2.new(0.5, math.cos(r)*(targetBtn.AbsoluteSize.X/2+3), 0.5, math.sin(r)*(targetBtn.AbsoluteSize.Y/2+3))
+                RunService.RenderStepped:Wait()
+            end
+        end)
+    end
+
+    local firstTab = true
+    function Library:CreateTab(name)
+        local page = Instance.new("ScrollingFrame", pages)
+        page.Name = name .. "Page"
+        page.Size = UDim2.new(1, 0, 1, 0)
+        page.BackgroundTransparency = 1
+        page.Visible = false
+        page.ScrollBarThickness = 2
+        page.ZIndex = 21
+        local pageLayout = Instance.new("UIListLayout", page)
+        pageLayout.Padding = UDim.new(0, 10)
+        pageLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+        local tabBtn = Instance.new("TextButton", tabList)
+        tabBtn.Size = UDim2.new(0, 130, 0, 36)
+        tabBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+        tabBtn.BackgroundTransparency = 0.5
+        tabBtn.Text = name
+        tabBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+        tabBtn.Font = Enum.Font.GothamSemibold
+        tabBtn.TextSize = 13
+        tabBtn.ZIndex = 15
+        Instance.new("UICorner", tabBtn)
+        local tabStroke = Instance.new("UIStroke", tabBtn)
+        tabStroke.Thickness = 0; tabStroke.Color = Color3.fromRGB(255, 245, 150)
+
+        tabBtn.MouseButton1Click:Connect(function()
+            PlayCustomClick()
+            for _, v in pairs(pages:GetChildren()) do if v:IsA("ScrollingFrame") then v.Visible = false end end
+            for _, v in pairs(tabList:GetChildren()) do 
+                if v:IsA("TextButton") then 
+                    v.TextColor3 = Color3.fromRGB(180, 180, 180)
+                    v.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+                    v:FindFirstChildOfClass("UIStroke").Thickness = 0
+                end 
+            end
+            page.Visible = true
+            tabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            tabBtn.BackgroundColor3 = Color3.fromRGB(70, 65, 35)
+            tabStroke.Thickness = 1.5
+            CreateOrbitEffect(tabBtn)
+        end)
+
+        if firstTab then
+            task.delay(0.1, function()
+                page.Visible = true; tabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                tabBtn.BackgroundColor3 = Color3.fromRGB(70, 65, 35); tabStroke.Thickness = 1.5
+                CreateOrbitEffect(tabBtn)
+            end)
+            firstTab = false
+        end
+
+        local elements = {}
+        function elements:AddToggle(text, callback)
+            local toggleFrame = Instance.new("TextButton", page)
+            toggleFrame.Size = UDim2.new(1, -10, 0, 40)
+            toggleFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+            toggleFrame.Text = ""
+            toggleFrame.AutoButtonColor = false
+            toggleFrame.ZIndex = 25
+            Instance.new("UICorner", toggleFrame)
+            
+            local label = Instance.new("TextLabel", toggleFrame)
+            label.Size = UDim2.new(1, -60, 1, 0); label.Position = UDim2.new(0, 15, 0, 0)
+            label.BackgroundTransparency = 1; label.Text = text; label.TextColor3 = Color3.fromRGB(255, 255, 255)
+            label.Font = Enum.Font.Gotham; label.TextSize = 13; label.TextXAlignment = Enum.TextXAlignment.Left; label.ZIndex = 26
+
+            local tglBg = Instance.new("Frame", toggleFrame)
+            tglBg.Size = UDim2.new(0, 42, 0, 22); tglBg.Position = UDim2.new(1, -52, 0.5, -11)
+            tglBg.BackgroundColor3 = Color3.fromRGB(60, 60, 60); tglBg.ZIndex = 26
+            Instance.new("UICorner", tglBg).CornerRadius = UDim.new(1, 0)
+
+            local tglDot = Instance.new("Frame", tglBg)
+            tglDot.Size = UDim2.new(0, 18, 0, 18); tglDot.Position = UDim2.new(0, 2, 0.5, -9)
+            tglDot.BackgroundColor3 = Color3.fromRGB(255, 255, 255); tglDot.ZIndex = 27
+            Instance.new("UICorner", tglDot).CornerRadius = UDim.new(1, 0)
+
+            local enabled = false
+            local function update()
+                TweenService:Create(tglDot, TweenInfo.new(0.2), {Position = enabled and UDim2.new(0, 22, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)}):Play()
+                TweenService:Create(tglBg, TweenInfo.new(0.2), {BackgroundColor3 = enabled and Color3.fromRGB(255, 245, 100) or Color3.fromRGB(60, 60, 60)}):Play()
+            end
+
+            toggleFrame.MouseButton1Click:Connect(function()
+                PlayCustomClick()
+                enabled = not enabled
+                update()
+                callback(enabled)
+            end)
+        end
+
+        function elements:AddButton(text, callback)
+            local btn = Instance.new("TextButton", page)
+            btn.Size = UDim2.new(1, -10, 0, 40)
+            btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+            btn.Text = "  " .. text
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.Font = Enum.Font.Gotham; btn.TextSize = 13; btn.TextXAlignment = Enum.TextXAlignment.Left
+            btn.ZIndex = 25
+            Instance.new("UICorner", btn)
+            btn.MouseButton1Click:Connect(function()
+                PlayCustomClick()
+                callback()
+            end)
+        end
+        return elements
+    end
+
+    local closeBtn = Instance.new("TextButton", main)
+    closeBtn.Size = UDim2.new(0, 30, 0, 30); closeBtn.Position = UDim2.new(1, -35, 0, 5)
+    closeBtn.BackgroundTransparency = 1; closeBtn.Text = "×"; closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeBtn.TextSize = 25; closeBtn.ZIndex = 50
+    closeBtn.MouseButton1Click:Connect(function()
+        PlayCustomClick()
+        TweenService:Create(main, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0)}):Play()
+        task.delay(0.4, function() main.Visible = false; openBtn.Visible = true end)
+    end)
+
+    local function Drag(obj)
+        local dragging, dragInput, dragStart, startPos
+        obj.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true; dragStart = input.Position; startPos = obj.Position
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local delta = input.Position - dragStart
+                obj.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end)
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
+        end)
+    end
+    Drag(main); Drag(openBtn)
+
+    openBtn.MouseButton1Click:Connect(function()
+        PlayCustomClick(); openBtn.Visible = false; main.Visible = true
+        main.Position = UDim2.new(0.5, 0, 0.5, 0)
+        TweenService:Create(main, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = mainSize}):Play()
+    end)
+
+    coroutine.wrap(function()
+        local h = 0
+        while screenGui.Parent do
+            h = h + 1/400; local c = Color3.fromHSV(h%1, 0.6, 1)
+            mainStroke.Color = c; openStroke.Color = c; logoStroke.Color = c
+            RunService.RenderStepped:Wait()
+        end
+    end)()
+    return Library, screenGui
+end
+
+-- [MAIN INITIALIZATION]
+local win, rootGui = Library:CreateWindow()
+
+local combatTab = win:CreateTab("Combat")
+combatTab:AddToggle("Silent Hitbox (All NPCs)", function(v) silentEnabled = v end)
+combatTab:AddToggle("Show Hitbox", function(v) showHitbox = v end)
+
+local visualTab = win:CreateTab("Visuals")
+visualTab:AddToggle("ESP Sphere (M:G, Z:R)", function(v)
+    wallEnabled = v
+    if wallEnabled then for _, d in pairs(activeNPCs) do createBoxForPart(d.head) end else destroyAllBoxes() end
+end)
+visualTab:AddToggle("Auto Fast Scan", function(v)
+    fastScanEnabled = v
+    if v then
+        for _, m in ipairs(Workspace:GetChildren()) do
+            if m:IsA("Model") and not activeNPCs[m] and isValidNPC(m) then addNPC(m) end
+        end
+    end
+end)
+visualTab:AddToggle("FullBright", function(v)
+    fullBrightEnabled = v
+    if not v then for p, val in pairs(originalLighting) do lighting[p] = val end end
+end)
+
+local weaponTab = win:CreateTab("Weapons")
+weaponTab:Add

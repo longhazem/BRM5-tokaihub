@@ -1,1 +1,480 @@
---[[ v1.0.0 https://wearedevs.net/obfuscator ]] return(function(...)local J={"\056\051\088\084\105\084\061\061";"\102\067\113\069\077\074\061\061","\115\066\100\089\082\098\066\077\073\078\120\048\050\043\114\097\087\104\053\121\043\119\110\115\113\072\087\101\050\102\061\061","\050\048\097\115\120\049\071\105\053\097\088\104\087\107\076\116\104\048\115\102\068\114\049\061","\089\122\112\047","\083\102\088\116\120\122\103\071\087\074\061\061","\087\118\068\049\085\111\107\061","\080\071\047\107\100\054\119\111\104\101\061\061";"\076\051\088\121\065\051\107\099";"\107\104\122\103\109\106\118\099","\080\109\070\070","\070\122\121\111\085\086\074\061";"\111\067\106\099\102\097\051\098\057\083\105\067\089\122\105\112\105\084\090\061";"\056\070\114\101";"\100\112\110\071\079\101\061\061";"\065\049\070\087\083\113\068\061";"\043\107\114\097";"\051\084\061\061","\107\083\086\055\047\048\077\065";"\102\113\090\081\109\078\074\119\114\113\087\101\081\079\084\047","\076\113\056\117\065\075\073\067\116\073\103\116\109\102\054\075\111\102\061\061";"\117\089\071\054\121\102\061\061","\068\089\079\077\084\048\098\097\065\048\109\052\081\105\112\118\085\102\061\061";"\106\099\121\061","\114\100\114\115\080\086\048\097\106\104\079\048\069\087\120\121\074\101\061\061","\082\117\065\072\085\084\061\061";"\106\101\086\080\120\102\061\061","\047\078\085\106\120\078\099\070";"\052\097\109\119\072\077\051\106\090\085\113\117\098\071\116\121\117\103\110\061","\117\122\117\114\065\073\110\066\100\079\114\082\057\051\049\103\101\116\086\107\048\116\080\087\110\104\072\075\101\102\061\061","\067\107\083\086\086\068\067\114\122\102\057\088\103\048\116\071";"\068\083\119\121\068\048\081\114\073\087\079\043\069\043\119\114","\103\076\118\112\089\048\121\087\089\073\070\083\107\048\067\075\099\110\114\072\043\101\061\061","\100\051\108\053\076\065\057\073","\069\077\116\117\110\102\061\061";"\114\110\102\075","\119\088\110\082\098\088\085\105\119\050\112\082\068\057\089\106","\108\077\080\105\116\098\121\090\076\113\099\089\121\066\073\043\118\074\121\052\104\085\067\100\088\067\078\089\115\071\043\109\055\050\066\084\114\098\047\090\088\071\110\050\107\078\119\076\081\118\079\081\105\098\070\087\074\111\048\072\117\047\074\061";"\089\047\111\115\053\103\102\113\065\119\072\075\121\068\117\070\113\076\104\080";"\076\105\115\105\101\074\061\061";"\107\118\107\106\087\087\068\111\067\119\068\102\120\110\052\077\117\122\049\061","\087\122\043\066\067\069\077\048\115\118\118\074\049\043\099\116\104\113\084\043","\122\076\118\049\054\085\055\122\086\070\110\061";"\048\079\075\099\097\053\057\115\103\118\075\104\116\114\075\115\053\108\066\070\082\077\121\061";"\120\111\048\077\056\111\067\097\100\076\079\077\065\107\114\069","\107\119\086\101\105\074\061\061";"\115\080\087\043\101\098\113\090\075\085\090\061","\099\100\076\047";"\121\072\076\107\079\048\112\089\085\057\113\090\090\081\097\078\084\104\084\061";"\089\104\097\049\079\074\061\061";"\107\111\111\081\048\070\121\122\086\122\101\061";"\072\072\049\090\072\116\070\070\071\050\109\049\110\086\054\121\051\084\061\061","\117\089\071\106\073\104\109\112\069\101\061\061","\068\097\097\084\066\057\102\082\101\079\053\053\089\047\087\102\054\097\071\082\111\089\116\121\071\078\087\116\101\084\067\048\053\073\087\103\048\087\122\050\076\057\072\050\083\065\106\077\103\108\114\050\087\066\070\068\077\068\076\081\074\102\061\061";"\109\076\066\085\066\081\097\076\043\052\089\079\113\055\121\109";"\109\078\112\105\121\050\071\108\073\104\081\083\079\101\061\061";"\075\120\106\122\047\101\061\061","\085\053\072\116\113\117\084\054\055\066\072\061","\068\078\115\119\085\050\106\109\068\078\076\116\079\083\087\075\084\081\057\061","\101\085\054\085\079\105\075\120\050\111\121\061";"\119\079\050\103\069\086\057\061","\066\052\116\114","\081\108\075\085\049\084\061\061","\107\114\118\108\109\067\066\088\122\118\103\086\121\086\090\061","\099\098\071\071\051\043\077\081\047\081\049\061","\117\112\080\118\065\086\076\097\086\084\110\085\122\101\061\061";"\083\071\090\069\082\085\053\070\069\120\088\110\122\086\101\061";"\051\056\097\090\051\043\107\105\122\085\112\116";"\121\050\071\053\073\086\081\067\099\088\082\112";"\081\109\067\100";"\068\122\080\103\097\102\061\061","\081\104\081\083\079\078\071\053\068\074\061\061";"\057\070\117\116\087\102\061\061";"\055\075\086\078\051\073\047\074\073\112\072\061","\090\043\111\055\082\102\061\061","\069\116\081\115\108\082\088\120\103\121\089\077";"\084\083\109\108\090\067\049\102\073\090\109\078\085\089\085\053\079\054\084\061";"\073\112\079\087\085\050\082\049\109\086\081\089\084\050\107\105\069\054\090\061";"\073\078\081\108","\084\099\077\079\119\054\057\061";"\103\079\048\118\065\118\100\105\066\105\066\086\070\070\068\061";"\069\098\110\057\120\078\083\084\105\079\119\108\105\084\061\061","\116\055\104\105\057\102\061\061";"\065\088\119\082\090\050\119\114\047\083\112\080\085\048\055\078","\068\090\067\114","\087\122\051\070\069\082\055\111\121\104\101\055\067\048\066\112\050\114\088\065\082\118\105\070\105\074\061\061";"\108\057\118\102\085\074\061\061";"\119\105\066\078";"\118\112\073\067";"\079\067\115\083\073\057\081\056\098\104\082\081\098\072\097\102\079\067\068\061","\073\118\056\116\043\110\078\057\102\084\061\061","\120\098\087\108\077\101\122\070\051\082\047\106\077\057\102\119\065\084\061\061";"\117\071\073\112\050\114\067\061","\088\043\079\054\100\105\112\052\110\084\061\061";"\054\072\079\108","\057\120\080\106\071\075\069\120\116\074\057\106\047\108\113\104\104\080\115\083\069\086\118\067\102\071\049\049\069\043\103\050\078\067\082\119\066\106\067\101\068\054\106\070\117\109\049\103\086\055\088\053\084\087\066\081\050\051\057\077\053\087\109\080\050\117\076\089";"\116\112\079\085\117\074\065\120\087\075\110\078\122\066\098\073\104\090\105\070\083\102\061\061","\109\074\114\081\071\072\122\102\102\098\121\100\057\114\072\061","\085\120\072\087\073\084\061\061";"\053\078\117\077";"\114\065\050\088\081\102\061\061";"\065\100\086\049\076\079\075\115\108\087\067\098\112\065\082\119\067\101\061\061";"\090\066\075\116\078\084\082\117\053\120\074\084\120\118\071\086\109\065\043\054\116\072\083\121\117\118\103\111\080\079\055\048\055\101\086\072\116\103\102\078\076\086\054\103\111\097\100\090\111\072\122\076\106\079\050\065\077\086\088\098\108\076\070\115";"\106\101\082\100\047\102\061\061","\075\075\082\073\068\101\061\061";"\122\108\072\111\120\072\073\087\122\084\061\061","\048\089\079\056\065\088\106\087\081\057\119\089\098\072\082\113\081\087\101\061";"\076\082\078\088";"\076\057\074\119\107\084\061\061";"\113\107\066\073\112\101\061\061","\053\098\077\056\086\074\061\061","\080\115\090\076\086\082\043\097\121\117\121\099\086\102\067\119","\088\090\071\088\084\054\087\102\085\088\089\051\098\050\098\119\099\101\061\061";"\077\089\106\054\054\102\061\061","\083\055\082\050\069\108\116\049\105\084\077\103\118\106\111\071","\085\104\111\049\101\109\066\048";"\120\079\071\081\065\103\106\074\079\086\117\051\043\043\050\090\077\102\061\061";"\117\089\071\077\098\088\107\061","\082\120\116\079\086\120\068\115\097\082\054\076\047\090\065\103\070\083\089\083\074\047\110\061";"\067\074\061\061","\098\104\116\118\073\086\110\061","\121\050\071\108\121\050\087\067","\113\075\109\116\102\086\070\103","\113\107\074\080\057\067\110\121";"\112\047\109\105";"\056\057\066\100\080\112\088\113\114\102\061\061";"\047\117\119\055";"\079\056\075\121\073\119\121\047\081\109\117\049\071\086\085\061","\117\101\053\097\099\075\097\043\085\069\103\090\055\068\078\104\074\049\089\116\055\112\097\109\056\097\111\109\113\074\061\061";"\111\099\084\048\102\076\056\112\089\055\052\087","\081\111\112\106\099\088\106\114\068\057\098\078\048\088\076\089\069\084\061\061","\116\069\101\076\088\102\071\078","\085\068\090\056\086\105\051\115","\117\067\085\061";"\108\049\107\047\083\114\085\061","\116\073\057\083\117\122\087\076\073\099\104\113\082\049\067\083","\114\076\105\070";"\075\084\047\103\078\053\104\117\118\101\061\061","\100\084\114\070\055\098\089\066";"\090\104\079\055\100\069\088\047\075\074\061\061","\116\109\120\071\082\074\061\061";"\112\109\108\077\109\054\054\104\115\102\061\061","\098\050\087\115\098\084\061\061";"\047\088\082\105\079\078\087\108\121\050\090\061","\108\120\053\076\097\050\072\112\087\120\084\061","\102\049\055\117\088\077\089\119\083\119\047\053\043\109\083\120\086\103\121\061","\075\085\088\120\076\072\083\074\065\083\100\050","\047\103\056\090","\088\065\112\069\102\074\061\061";"\097\103\078\104";"\073\054\055\067\113\087\098\068\065\051\057\061";"\055\080\050\097";"\109\106\084\097";"\109\043\089\084\079\086\056\082\104\101\061\061";"\108\122\088\097\099\097\101\101\065\066\084\061";"\054\067\083\097\054\056\089\051\104\050\084\105\076\098\107\053\090\077\077\119\083\066\051\113\073\101\061\061";"\109\110\100\070\065\089\098\112\106\077\120\047","\082\097\049\119\079\099\076\067\051\102\061\061","\057\115\076\073\120\087\073\114\071\084\061\061";"\068\054\103\050\078\113\084\115";"\098\043\110\047\120\100\087\098\043\109\066\089\083\108\083\077\105\105\054\081";"\122\102\116\074\057\054\121\061";"\086\077\069\098\121\043\101\065\078\120\050\110";"\080\110\047\043\086\051\049\110\120\116\070\073\102\084\073\053\106\081\114\114","\108\066\077\051\090\118\114\106\048\074\061\061","\047\053\066\086","\107\057\051\107\108\109\108\108","\084\050\071\108\073\104\081\083\079\101\061\061";"\088\083\121\079\121\101\074\061","\052\086\074\071\081\085\106\112\098\084\061\061","\069\078\071\119\084\072\097\054\047\072\113\077\109\081\087\119","\053\085\085\047\089\101\061\061";"\088\098\068\105\100\073\117\070\072\053\118\106\068\103\048\109\079\074\089\067\080\068\102\072\120\097\105\115\116\101\061\061";"\048\120\099\047\113\056\057\061","\104\079\109\088","\099\056\068\069\071\102\115\100\078\083\051\072";"\070\067\109\066\079\107\056\081\074\105\085\100\086\051\117\102";"\104\086\108\118\109\053\117\080\047\089\111\068\071\057\068\080\105\043\100\080\117\119\114\077\108\084\061\061","\070\102\053\098\100\104\121\061","\090\048\110\118\066\088\054\115\098\055\050\107\055\084\061\061","\097\121\105\072\115\089\102\061","\049\085\051\122\115\049\102\069\053\101\068\061";"\099\119\054\115\102\088\102\061";"\104\051\098\071\109\109\107\110\116\074\061\061";"\116\117\086\084\103\057\057\049\103\119\101\090\115\108\043\052\065\108\067\100\112\076\085\061","\078\085\090\068\102\122\098\110\109\084\061\061";"\067\105\053\073\065\072\066\114\055\117\090\065\087\101\061\061";"\056\115\088\090\118\102\061\061";"\098\105\082\051\075\102\061\061","\108\121\098\076\117\102\061\061","\085\081\084\061";"\116\072\103\088\079\080\117\102\100\054\086\049\115\086\054\113";"\066\108\087\098\084\078\055\121\086\055\110\117\117\084\061\061";"\119\119\081\052\088\097\086\104\080\073\103\108\102\101\061\061","\081\088\106\087\090\081\106\119\047\090\113\057\099\111\079\083","\097\085\056\106\073\101\061\061";"\054\112\084\120\100\113\074\061";"\079\118\104\065\076\119\071\090\120\097\066\048\103\098\107\077\070\080\099\047","\110\079\076\120\113\087\084\061";"\098\090\106\108\099\072\082\118\079\072\116\065\069\072\097\100";"\053\120\051\122\102\102\061\061";"\105\056\084\057\107\121\104\109","\057\085\117\121\114\117\112\102\071\099\104\085\087\074\061\061";"\088\083\084\050\055\084\061\061","\087\054\075\048\056\082\077\110\113\117\072\061","\073\078\114\047\049\084\061\061";"\086\072\103\072\105\081\118\068\089\047\065\049\056\083\052\087\119\117\070\121\088\065\085\112","\084\088\109\072\084\054\081\067\079\078\071\108";"\101\113\100\088\112\115\080\055\077\076\121\061","\119\067\082\121\085\117\110\082","\088\109\098\083\112\057\119\065\119\076\087\076\115\068\082\121\088\109\056\071\080\074\061\061";"\090\052\055\115\097\074\061\061","\081\070\079\078";"\068\120\099\082\087\115\075\056";"\099\119\085\052\051\051\099\113\103\088\069\076\081\078\097\103\083\099\075\073\097\078\082\072\107\087\084\117\090\107\049\078\121\087\070\074\113\088\117\106\101\072\052\054\088\052\054\071\097\070\102\047\118\085\078\076\082\050\108\107\067\067\103\106\075\054\084\097","\116\100\048\101","\071\055\115\106\108\067\116\116","\067\113\110\108";"\117\050\116\072\048\054\121\075\087\066\103\050\112\074\061\061";"\049\048\048\088\066\115\077\061","\104\084\111\113\115\084\061\061";"\073\048\065\077\098\119\087\112\055\102\061\061","\055\057\048\109","\085\087\071\080\105\074\073\121\047\073\114\109\119\077\057\069";"\070\077\106\118\109\071\079\076\110\108\102\106\067\099\054\053\088\084\061\061";"\074\073\079\116\121\074\068\077\057\054\105\089\087\073\089\112\074\069\055\071\054\101\061\061","\048\104\056\054\083\072\099\089\067\070\065\081\074\080\105\118\105\052\051\121\090\077\090\061";"\082\100\103\089\055\049\109\081","\073\043\110\061";"\098\084\070\113\121\076\066\118\066\087\052\105\050\074\061\061","\097\103\111\049\122\089\119\102\105\101\061\061","\119\069\071\043","\084\067\112\089\047\078\112\098\069\112\119\075\090\089\101\107\098\102\061\061";"\114\104\072\065\049\122\086\050\052\066\085\061","\084\050\056\119\053\121\055\083\121\071\072\061";"\079\053\116\083\065\103\072\112\049\110\115\054\100\066\122\068\057\102\061\061";"\121\104\074\085","\116\102\043\098\068\056\122\081\081\107\102\061";"\077\051\110\065";"\073\048\052\056\043\069\088\069\080\072\088\111\053\113\067\117\073\087\082\120\074\068\056\078\049\081\068\056\070\102\061\061","\099\073\105\066\081\109\102\061";"\072\066\099\051\100\083\106\073\074\072\070\098\072\119\066\070\115\055\078\121\097\098\086\122\107\071\051\122\043\084\115\087\100\048\115\084\112\103\107\116\087\103\101\112\084\114\073\066\086\075\084\055\077\083\055\116\069\057\052\052\086\069\077\112";"\120\067\049\089\112\122\050\084\113\112\109\088\089\115\120\110\069\117\101\109\069\119\115\088\049\100\109\086\056\122\115\121\087\052\071\098\105\099\043\119\098\073\056\115\104\088\086\101\074\085\084\109\051\083\079\049\113\111\084\054\066\104\114\043\120\056\070\111\088\101\061\061";"\078\119\110\109\122\081\067\068\054\073\114\097\077\075\086\115\053\084\061\061";"\098\074\061\061","\112\053\084\049\051\085\112\077\115\066\100\085\104\056\043\076\053\087\109\065\107\115\116\083";"\112\067\057\107\054\120\089\070\056\118\088\106\080\084\061\061";"\071\120\122\068\070\053\070\104\048\084\061\061";"\077\105\099\077\118\088\101\084\074\086\077\079";"\067\088\118\054\104\065\048\116\054\068\068\057";"\104\065\108\048\057\067\117\102\065\104\116\107\109\113\071\083\087\102\061\061","\057\085\090\107\048\073\054\050\052\084\061\061","\115\108\052\104\117\102\105\078\068\089\087\087\071\099\088\057";"\117\070\081\050\086\075\109\051\053\080\054\052\054\056\107\061","\057\085\084\116\085\073\076\105\048\120\054\055\051\085\117\090\050\111\049\061","\078\116\110\075\100\114\065\113\114\101\061\061";"\071\106\068\061";"\099\067\102\120\106\050\075\081\053\066\049\061";"\047\067\085\116\065\081\113\081\079\117\055\043\109\050\112\110\073\102\061\061","\103\113\083\083","\084\086\097\112\121\117\109\112\081\078\087\056";"\073\098\104\090\069\080\072\114\108\110\089\071\104\043\083\086\079\100\065\047\120\074\061\061";"\073\109\068\048";"\102\117\076\112\051\085\078\057\099\100\052\116\055\105\075\081","\121\065\114\102\109\121\118\049";"\116\097\108\043\057\074\055\099\083\081\047\067\088\110\117\110\052\072\103\089\070\100\111\117\043\103\069\089","\073\067\116\112\073\067\087\075\073\087\055\115\098\067\085\105\068\074\061\061","\084\068\106\086\065\116\121\086";"\073\088\087\067\099\101\061\061","\119\097\102\087\107\110\109\101\121\084\061\061","\081\078\087\115\085\078\081\053\110\057\109\112\079\078\081\083\079\078\081\072\110\084\061\061","\098\056\056\089","\088\120\105\111\051\116\072\061";"\119\055\086\072\071\073\076\049\074\116\084\061";"\098\057\049\118\077\120\067\119\074\113\105\082\089\101\061\061";"\047\102\083\067","\068\117\119\067\121\112\119\111\069\083\121\105\098\087\098\051\048\067\121\061","\079\118\110\052\077\098\101\107\088\054\090\061";"\053\103\050\073\071\043\102\083\110\090\085\052\121\101\061\061","\055\057\088\043\110\084\061\061","\068\084\115\077\070\080\109\090\049\078\118\070\067\112\049\103\115\118\099\108","\051\051\079\114\080\074\061\061","\048\111\107\055\087\084\061\061","\098\050\089\113\079\078\119\049","\053\115\083\075\119\055\120\116\122\053\113\097\050\119\068\101\050\101\061\061";"\079\079\052\084\097\116\053\055\100\101\061\061","\119\070\116\099","\078\108\070\105\050\055\050\068\115\106\067\054\086\079\081\113\066\074\089\120\076\118\110\069\069\101\054\057\101\102\061\061","\109\050\081\067\084\050\113\106\073\078\109\053\098\088\107\061","\081\078\106\066\099\050\082\119\079\111\087\090\068\111\109\083\085\050\049\061","\097\118\099\122\057\090\072\101\104\074\088\084","\116\084\088\088\097\057\048\088\119\106\100\065\075\043\067\048\065\065\110\061";"\073\084\122\082\073\083\080\112\090\056\078\065\076\102\061\061";"\111\113\100\077\105\065\105\076","\043\065\071\099\078\105\052\068\111\079\122\115\116\106\080\110\116\084\061\061","\068\112\087\121\099\089\081\109\084\048\079\107\098\083\068\053\048\104\068\061","\053\112\090\043\112\099\107\114\109\053\085\061";"\089\077\105\089\103\113\090\099\052\102\061\061";"\098\081\043\098\050\110\085\052","\069\054\106\115\081\072\112\081\121\104\116\111\088\088\106\067\121\074\061\061";"\121\054\112\067\098\084\061\061","\076\054\109\086","\107\097\084\089\054\102\048\116\076\043\113\075\105\043\082\089";"\100\075\082\077";"\098\050\081\067\099\111\081\106","\118\074\073\075\118\102\061\061";"\074\080\054\047\088\057\114\113\104\117\122\117\104\115\081\072\107\077\122\108\120\055\107\070\049\117\066\043\074\055\076\061","\071\085\090\083\085\086\097\065\068\112\110\119\121\050\052\077\107\086\078\108\090\043\075\076\117\085\115\090";"\053\065\048\075";"\109\088\043\101\115\084\061\061","\072\113\072\084\105\071\108\112";"\121\119\049\114\051\098\117\071\100\102\061\061";"\076\073\069\079","\054\106\088\100\047\067\073\077\075\116\052\072\118\083\049\099\048\056\071\105\112\055\057\061";"\080\113\111\049\070\101\061\061","\111\056\084\088\105\067\101\050\109\115\051\085\121\082\101\088\055\072\069\102\043\102\061\061";"\112\089\077\074\081\115\090\103","\065\097\066\068","\121\050\113\113\085\074\061\061","\089\065\113\120\112\074\111\088","\075\107\080\052\069\084\090\072\115\072\088\048\086\055\078\043\111\108\057\086\111\074\061\061","\086\118\112\097\107\050\056\120","\079\087\097\057\048\083\079\087\065\087\057\086\121\117\074\050\090\072\072\061","\111\099\098\089";"\078\110\055\084\098\102\061\061";"\048\104\112\082\069\090\082\049\048\117\121\116\079\087\097\104\079\084\061\061";"\082\080\077\077\107\111\111\114\079\113\068\083\049\082\072\100","\072\074\070\115","\051\115\051\074\117\122\067\061";"\073\078\071\086\098\117\110\061";"\109\105\086\052","\065\076\105\083\112\077\114\118\054\102\061\061";"\081\072\097\109\081\050\082\056\090\104\106\100\085\087\106\114\084\084\061\061";"\118\078\086\043\087\101\061\061","\122\120\106\104\075\117\056\066\069\088\105\085\107\068\105\069\088\053\099\049\108\050\115\078\043\089\108\099\098\084\061\061";"\065\110\078\099\049\043\115\101\087\113\050\053";"\104\049\110\113\088\081\050\102\066\090\120\109\116\074\055\114\098\090\076\119";"\066\052\122\108\050\080\071\070\112\083\082\111\105\048\056\103\079\053\110\078\119\067\080\103\120\107\074\118\079\102\061\061";"\068\067\116\051\068\057\084\086\119\054\113\118\084\048\055\118\068\067\067\061","\102\118\048\118\051\116\101\099","\080\116\114\070";"\079\078\113\112\109\048\068\116\048\067\109\098\069\104\087\048","\079\113\065\105\053\075\069\073\089\107\102\061","\085\078\087\106\085\054\068\061","\071\082\104\065\053\070\099\075\073\084\061\061","\116\075\100\079\055\084\055\073\111\114\110\061","\104\083\086\069\101\053\117\057","\118\097\048\111\079\068\052\043\053\068\102\061","\101\122\066\057\111\068\076\068\071\076\115\048\066\074\061\061","\088\089\10
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local SoundService = game:GetService("SoundService")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RS = game:GetService("ReplicatedStorage")
+local lighting = game:GetService("Lighting")
+
+-- [ORIGINAL LOGIC - DO NOT TOUCH]
+local localPlayer = Players.LocalPlayer
+local camera = Workspace.CurrentCamera
+local TARGET_HITBOX_SIZE = Vector3.new(15, 15, 15)
+local activeNPCs = {}      
+local trackedParts = {}    
+local originalSizes = {}   
+local wallConnections = {} 
+
+local wallEnabled = false       
+local silentEnabled = false     
+local showHitbox = false        
+local fullBrightEnabled = false 
+local isUnloaded = false        
+local fastScanEnabled = false   
+local patchOptions = { recoil = false, firemodes = false }
+
+local maleColor = Color3.fromRGB(0, 255, 0)
+local zombieColor = Color3.fromRGB(255, 0, 0)
+
+local originalLighting = {
+    Brightness = lighting.Brightness,
+    ClockTime = lighting.ClockTime,
+    FogEnd = lighting.FogEnd,
+    GlobalShadows = lighting.GlobalShadows,
+    Ambient = lighting.Ambient
+}
+
+local function getRootPart(model)
+    return model:FindFirstChild("Root") or model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("UpperTorso")
+end
+
+local function isValidNPC(model)
+    local name = model.Name:lower()
+    local isTargetName = (name == "male" or name == "zombie" or name == "zombies")
+    if name == "male" then
+        local hasAI = false
+        for _, c in ipairs(model:GetChildren()) do
+            if type(c.Name) == "string" and c.Name:sub(1, 3) == "AI_" then hasAI = true break end
+        end
+        return hasAI
+    end
+    return isTargetName
+end
+
+local function createBoxForPart(part)
+    if not part or part:FindFirstChild("Wall_Box") then return end
+    local sphere = Instance.new("SphereHandleAdornment")
+    sphere.Name = "Wall_Box"
+    sphere.Radius = 1.2
+    sphere.Adornee = part
+    sphere.AlwaysOnTop = true 
+    sphere.ZIndex = 10
+    sphere.Transparency = 0.1
+    sphere.Parent = part
+    trackedParts[part] = true
+end
+
+local function destroyAllBoxes()
+    for part, _ in pairs(trackedParts) do
+        if part and part:FindFirstChild("Wall_Box") then pcall(function() part.Wall_Box:Destroy() end) end
+    end
+    trackedParts = {}
+end
+
+local function applySilentHitbox(model, root)
+    if not originalSizes[model] then originalSizes[model] = root.Size end
+    root.Size = TARGET_HITBOX_SIZE
+    root.Transparency = showHitbox and 0.85 or 1 
+    root.Color = Color3.fromRGB(255, 0, 0)
+    root.CanCollide = true
+end
+
+local function restoreOriginalSize(model)
+    local root = getRootPart(model)
+    if root and originalSizes[model] then
+        root.Size = originalSizes[model]
+        root.Transparency = 1
+        root.CanCollide = false
+    end
+    originalSizes[model] = nil
+end
+
+local function addNPC(model)
+    if activeNPCs[model] or not isValidNPC(model) then return end
+    local head = model:FindFirstChild("Head")
+    local root = getRootPart(model)
+    if not (head or root) then return end
+    activeNPCs[model] = { head = head or root, root = root }
+    if wallEnabled then createBoxForPart(head or root) end
+end
+
+local function patchWeapons(options)
+    local weaponsFolder = RS:FindFirstChild("Shared")
+        and RS.Shared:FindFirstChild("Configs")
+        and RS.Shared.Configs:FindFirstChild("Weapon")
+        and RS.Shared.Configs.Weapon:FindFirstChild("Weapons_Player")
+    if not weaponsFolder then return end
+    for _, platform in pairs(weaponsFolder:GetChildren()) do
+        if platform.Name:match("^Platform_") then
+            for _, weapon in pairs(platform:GetChildren()) do
+                for _, child in pairs(weapon:GetChildren()) do
+                    if child:IsA("ModuleScript") and child.Name:match("^Receiver%.") then
+                        local success, receiver = pcall(require, child)
+                        if success and receiver and receiver.Config and receiver.Config.Tune then
+                            local tune = receiver.Config.Tune
+                            if options.recoil then
+                                tune.Recoil_X = 0 tune.Recoil_Z = 0 tune.RecoilForce_Tap = 0
+                                tune.RecoilForce_Impulse = 0 tune.Recoil_Range = Vector2.zero
+                                tune.Recoil_Camera = 0 tune.RecoilAccelDamp_Crouch = Vector3.new(1, 1, 1)
+                                tune.RecoilAccelDamp_Prone = Vector3.new(1, 1, 1)
+                            end
+                            if options.firemodes then tune.Firemodes = {3, 2, 1, 0} end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- [LIBRARY CONFIG]
+local function CleanupOldUI()
+    local oldUI = (gethui and gethui():FindFirstChild("TOKAIHUB")) or game.CoreGui:FindFirstChild("TOKAIHUB")
+    if oldUI then oldUI:Destroy() end
+end
+CleanupOldUI()
+
+local BackgroundList = {
+    "rbxthumb://type=Asset&id=13605715274&w=420&h=420",
+    "rbxthumb://type=Asset&id=10935179737&w=420&h=420",
+    "rbxthumb://type=Asset&id=97182163526089&w=420&h=420",
+    "rbxthumb://type=Asset&id=114016973837508&w=420&h=420",
+    "rbxthumb://type=Asset&id=101612750444882&w=420&h=420",
+    "rbxthumb://type=Asset&id=2014971747&w=420&h=420",
+    "rbxthumb://type=Asset&id=101959737652480&w=420&h=420",
+    "rbxthumb://type=Asset&id=110802555840064&w=420&h=420",
+    "rbxthumb://type=Asset&id=598493435&w=420&h=420",
+    "rbxthumb://type=Asset&id=10007194277&w=420&h=420"
+}
+if not _G.BackgroundState then _G.BackgroundState = { CurrentIndex = 1, LastUpdate = tick() } end
+
+local function PlayCustomClick()
+    local sound = Instance.new("Sound")
+    sound.SoundId = "rbxassetid://126347354635406"
+    sound.Volume = 0.8
+    sound.Parent = SoundService
+    sound:Play()
+    sound.Ended:Connect(function() sound:Destroy() end)
+end
+
+local Library = {}
+function Library:CreateWindow()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "TOKAIHUB"
+    screenGui.Parent = (gethui and gethui()) or game.CoreGui
+    screenGui.ResetOnSpawn = false
+    local mainSize = UDim2.new(0, 520, 0, 320)
+    local logoID = "rbxthumb://type=Asset&id=99217897221957&w=420&h=420"
+
+    local openBtn = Instance.new("ImageButton", screenGui)
+    openBtn.Name = "OpenButton"
+    openBtn.Size = UDim2.new(0, 55, 0, 55)
+    openBtn.Position = UDim2.new(0, 20, 0.5, -27)
+    openBtn.Visible = false
+    openBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    openBtn.Image = logoID
+    openBtn.ZIndex = 100
+    Instance.new("UICorner", openBtn).CornerRadius = UDim.new(1, 0)
+    local openStroke = Instance.new("UIStroke", openBtn)
+    openStroke.Thickness = 2
+
+    local main = Instance.new("Frame", screenGui)
+    main.Name = "MainFrame"
+    main.Size = UDim2.new(0, 0, 0, 0)
+    main.Position = UDim2.new(0.5, 0, 0.5, 0)
+    main.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+    main.BackgroundTransparency = 0.2
+    main.AnchorPoint = Vector2.new(0.5, 0.5)
+    main.ClipsDescendants = true
+    main.Active = true
+    Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
+    local mainStroke = Instance.new("UIStroke", main)
+    mainStroke.Thickness = 2
+
+    local mainBg = Instance.new("ImageLabel", main)
+    mainBg.Name = "Background"
+    mainBg.Size = UDim2.new(1, 0, 1, 0)
+    mainBg.BackgroundTransparency = 1
+    mainBg.Image = BackgroundList[_G.BackgroundState.CurrentIndex]
+    mainBg.ImageTransparency = 0.4
+    mainBg.ScaleType = Enum.ScaleType.Crop
+    mainBg.ZIndex = 1
+
+    TweenService:Create(main, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = mainSize}):Play()
+
+    task.spawn(function()
+        while task.wait(1) do
+            if not screenGui.Parent then break end
+            if tick() - _G.BackgroundState.LastUpdate >= 300 then
+                _G.BackgroundState.LastUpdate = tick()
+                _G.BackgroundState.CurrentIndex = (_G.BackgroundState.CurrentIndex % #BackgroundList) + 1
+                local tw = TweenService:Create(mainBg, TweenInfo.new(1.5), {ImageTransparency = 1})
+                tw:Play()
+                tw.Completed:Wait()
+                mainBg.Image = BackgroundList[_G.BackgroundState.CurrentIndex]
+                TweenService:Create(mainBg, TweenInfo.new(1.5), {ImageTransparency = 0.4}):Play()
+            end
+        end
+    end)
+
+    local sidebar = Instance.new("Frame", main)
+    sidebar.Name = "Sidebar"
+    sidebar.Size = UDim2.new(0, 150, 1, 0)
+    sidebar.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    sidebar.BackgroundTransparency = 0.4
+    sidebar.ZIndex = 10
+    Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 10)
+
+    local header = Instance.new("Frame", sidebar)
+    header.Name = "Header"
+    header.Size = UDim2.new(1, 0, 0, 60)
+    header.BackgroundTransparency = 1
+    header.ZIndex = 11
+
+    local logoImg = Instance.new("ImageLabel", header)
+    logoImg.Size = UDim2.new(0, 35, 0, 35)
+    logoImg.Position = UDim2.new(0, 12, 0.5, -17)
+    logoImg.BackgroundTransparency = 1
+    logoImg.Image = logoID
+    logoImg.ZIndex = 12
+    Instance.new("UICorner", logoImg).CornerRadius = UDim.new(1, 0)
+    local logoStroke = Instance.new("UIStroke", logoImg)
+    logoStroke.Color = Color3.fromRGB(255, 255, 255)
+    logoStroke.Thickness = 1.5
+
+    local titleText = Instance.new("TextLabel", header)
+    titleText.Size = UDim2.new(1, -55, 1, 0)
+    titleText.Position = UDim2.new(0, 52, 0, 0)
+    titleText.BackgroundTransparency = 1
+    titleText.Text = "TOKAI HUB"
+    titleText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleText.Font = Enum.Font.GothamBold
+    titleText.TextSize = 13
+    titleText.TextXAlignment = Enum.TextXAlignment.Left
+    titleText.ZIndex = 12
+
+    local pages = Instance.new("Frame", main)
+    pages.Name = "Pages"
+    pages.Size = UDim2.new(1, -170, 1, -20)
+    pages.Position = UDim2.new(0, 160, 0, 10)
+    pages.BackgroundTransparency = 1
+    pages.ZIndex = 20
+
+    local tabList = Instance.new("ScrollingFrame", sidebar)
+    tabList.Name = "TabList"
+    tabList.Size = UDim2.new(1, 0, 1, -70)
+    tabList.Position = UDim2.new(0, 0, 0, 65)
+    tabList.BackgroundTransparency = 1
+    tabList.ScrollBarThickness = 0
+    tabList.ZIndex = 11
+    local listLayout = Instance.new("UIListLayout", tabList)
+    listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    listLayout.Padding = UDim.new(0, 6)
+
+    local currentOrbit = nil
+    local function CreateOrbitEffect(targetBtn)
+        if currentOrbit then currentOrbit:Destroy() end
+        local orbit = Instance.new("Frame")
+        orbit.Size = UDim2.new(0, 5, 0, 5)
+        orbit.BackgroundColor3 = Color3.fromRGB(255, 245, 150)
+        orbit.BorderSizePixel = 0
+        orbit.ZIndex = 50
+        orbit.Parent = targetBtn
+        Instance.new("UICorner", orbit).CornerRadius = UDim.new(1, 0)
+        local glow = Instance.new("ImageLabel", orbit)
+        glow.Size = UDim2.new(4, 0, 4, 0); glow.Position = UDim2.new(-1.5, 0, -1.5, 0)
+        glow.BackgroundTransparency = 1; glow.Image = "rbxassetid://6015667101"; glow.ImageColor3 = Color3.fromRGB(255, 240, 100); glow.ZIndex = 49
+        currentOrbit = orbit
+        task.spawn(function()
+            local a = 0
+            while orbit and orbit.Parent == targetBtn do
+                a = a + 5
+                local r = math.rad(a)
+                orbit.Position = UDim2.new(0.5, math.cos(r)*(targetBtn.AbsoluteSize.X/2+3), 0.5, math.sin(r)*(targetBtn.AbsoluteSize.Y/2+3))
+                RunService.RenderStepped:Wait()
+            end
+        end)
+    end
+
+    local firstTab = true
+    function Library:CreateTab(name)
+        local page = Instance.new("ScrollingFrame", pages)
+        page.Name = name .. "Page"
+        page.Size = UDim2.new(1, 0, 1, 0)
+        page.BackgroundTransparency = 1
+        page.Visible = false
+        page.ScrollBarThickness = 2
+        page.ZIndex = 21
+        local pageLayout = Instance.new("UIListLayout", page)
+        pageLayout.Padding = UDim.new(0, 10)
+        pageLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+        local tabBtn = Instance.new("TextButton", tabList)
+        tabBtn.Size = UDim2.new(0, 130, 0, 36)
+        tabBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+        tabBtn.BackgroundTransparency = 0.5
+        tabBtn.Text = name
+        tabBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+        tabBtn.Font = Enum.Font.GothamSemibold
+        tabBtn.TextSize = 13
+        tabBtn.ZIndex = 15
+        Instance.new("UICorner", tabBtn)
+        local tabStroke = Instance.new("UIStroke", tabBtn)
+        tabStroke.Thickness = 0; tabStroke.Color = Color3.fromRGB(255, 245, 150)
+
+        tabBtn.MouseButton1Click:Connect(function()
+            PlayCustomClick()
+            for _, v in pairs(pages:GetChildren()) do if v:IsA("ScrollingFrame") then v.Visible = false end end
+            for _, v in pairs(tabList:GetChildren()) do 
+                if v:IsA("TextButton") then 
+                    v.TextColor3 = Color3.fromRGB(180, 180, 180)
+                    v.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+                    v:FindFirstChildOfClass("UIStroke").Thickness = 0
+                end 
+            end
+            page.Visible = true
+            tabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            tabBtn.BackgroundColor3 = Color3.fromRGB(70, 65, 35)
+            tabStroke.Thickness = 1.5
+            CreateOrbitEffect(tabBtn)
+        end)
+
+        if firstTab then
+            task.delay(0.1, function()
+                page.Visible = true; tabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                tabBtn.BackgroundColor3 = Color3.fromRGB(70, 65, 35); tabStroke.Thickness = 1.5
+                CreateOrbitEffect(tabBtn)
+            end)
+            firstTab = false
+        end
+
+        local elements = {}
+        function elements:AddToggle(text, callback)
+            local toggleFrame = Instance.new("TextButton", page)
+            toggleFrame.Size = UDim2.new(1, -10, 0, 40)
+            toggleFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+            toggleFrame.Text = ""
+            toggleFrame.AutoButtonColor = false
+            toggleFrame.ZIndex = 25
+            Instance.new("UICorner", toggleFrame)
+            
+            local label = Instance.new("TextLabel", toggleFrame)
+            label.Size = UDim2.new(1, -60, 1, 0); label.Position = UDim2.new(0, 15, 0, 0)
+            label.BackgroundTransparency = 1; label.Text = text; label.TextColor3 = Color3.fromRGB(255, 255, 255)
+            label.Font = Enum.Font.Gotham; label.TextSize = 13; label.TextXAlignment = Enum.TextXAlignment.Left; label.ZIndex = 26
+
+            local tglBg = Instance.new("Frame", toggleFrame)
+            tglBg.Size = UDim2.new(0, 42, 0, 22); tglBg.Position = UDim2.new(1, -52, 0.5, -11)
+            tglBg.BackgroundColor3 = Color3.fromRGB(60, 60, 60); tglBg.ZIndex = 26
+            Instance.new("UICorner", tglBg).CornerRadius = UDim.new(1, 0)
+
+            local tglDot = Instance.new("Frame", tglBg)
+            tglDot.Size = UDim2.new(0, 18, 0, 18); tglDot.Position = UDim2.new(0, 2, 0.5, -9)
+            tglDot.BackgroundColor3 = Color3.fromRGB(255, 255, 255); tglDot.ZIndex = 27
+            Instance.new("UICorner", tglDot).CornerRadius = UDim.new(1, 0)
+
+            local enabled = false
+            local function update()
+                TweenService:Create(tglDot, TweenInfo.new(0.2), {Position = enabled and UDim2.new(0, 22, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)}):Play()
+                TweenService:Create(tglBg, TweenInfo.new(0.2), {BackgroundColor3 = enabled and Color3.fromRGB(255, 245, 100) or Color3.fromRGB(60, 60, 60)}):Play()
+            end
+
+            toggleFrame.MouseButton1Click:Connect(function()
+                PlayCustomClick()
+                enabled = not enabled
+                update()
+                callback(enabled)
+            end)
+        end
+
+        function elements:AddButton(text, callback)
+            local btn = Instance.new("TextButton", page)
+            btn.Size = UDim2.new(1, -10, 0, 40)
+            btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+            btn.Text = "  " .. text
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.Font = Enum.Font.Gotham; btn.TextSize = 13; btn.TextXAlignment = Enum.TextXAlignment.Left
+            btn.ZIndex = 25
+            Instance.new("UICorner", btn)
+            btn.MouseButton1Click:Connect(function()
+                PlayCustomClick()
+                callback()
+            end)
+        end
+        return elements
+    end
+
+    local closeBtn = Instance.new("TextButton", main)
+    closeBtn.Size = UDim2.new(0, 30, 0, 30); closeBtn.Position = UDim2.new(1, -35, 0, 5)
+    closeBtn.BackgroundTransparency = 1; closeBtn.Text = "×"; closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeBtn.TextSize = 25; closeBtn.ZIndex = 50
+    closeBtn.MouseButton1Click:Connect(function()
+        PlayCustomClick()
+        TweenService:Create(main, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0)}):Play()
+        task.delay(0.4, function() main.Visible = false; openBtn.Visible = true end)
+    end)
+
+    local function Drag(obj)
+        local dragging, dragInput, dragStart, startPos
+        obj.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true; dragStart = input.Position; startPos = obj.Position
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local delta = input.Position - dragStart
+                obj.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end)
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
+        end)
+    end
+    Drag(main); Drag(openBtn)
+
+    openBtn.MouseButton1Click:Connect(function()
+        PlayCustomClick(); openBtn.Visible = false; main.Visible = true
+        main.Position = UDim2.new(0.5, 0, 0.5, 0)
+        TweenService:Create(main, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = mainSize}):Play()
+    end)
+
+    coroutine.wrap(function()
+        local h = 0
+        while screenGui.Parent do
+            h = h + 1/400; local c = Color3.fromHSV(h%1, 0.6, 1)
+            mainStroke.Color = c; openStroke.Color = c; logoStroke.Color = c
+            RunService.RenderStepped:Wait()
+        end
+    end)()
+    return Library, screenGui
+end
+
+-- [MAIN INITIALIZATION]
+local win, rootGui = Library:CreateWindow()
+
+local combatTab = win:CreateTab("Combat")
+combatTab:AddToggle("Silent Hitbox (All NPCs)", function(v) silentEnabled = v end)
+combatTab:AddToggle("Show Hitbox", function(v) showHitbox = v end)
+
+local visualTab = win:CreateTab("Visuals")
+visualTab:AddToggle("ESP Sphere (M:G, Z:R)", function(v)
+    wallEnabled = v
+    if wallEnabled then for _, d in pairs(activeNPCs) do createBoxForPart(d.head) end else destroyAllBoxes() end
+end)
+visualTab:AddToggle("Auto Fast Scan", function(v)
+    fastScanEnabled = v
+    if v then
+        for _, m in ipairs(Workspace:GetChildren()) do
+            if m:IsA("Model") and not activeNPCs[m] and isValidNPC(m) then addNPC(m) end
+        end
+    end
+end)
+visualTab:AddToggle("FullBright", function(v)
+    fullBrightEnabled = v
+    if not v then for p, val in pairs(originalLighting) do lighting[p] = val end end
+end)
+
+local weaponTab = win:CreateTab("Weapons")
+weaponTab:Add

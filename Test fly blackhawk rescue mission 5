@@ -1,7 +1,7 @@
 --[[ 
     --uhsh--
-    SỐ THỨ TỰ: 01
-    CHỨC NĂNG: TẠO NỀN TẢNG DƯỚI CHÂN CÓ NÚT BẬT TẮT
+    SỐ THỨ TỰ: 02 (Bản sửa lỗi tạo Part)
+    CHỨC NĂNG: TẠO NỀN TẢNG LIÊN TỤC KHI BẬT
     --uhsh--
 ]]
 
@@ -14,85 +14,78 @@ local pGui = player:WaitForChild("PlayerGui")
 
 -- --- CÀI ĐẶT ---
 local isEnabled = false
-local lastPos = Vector3.new(0, 0, 0)
 
--- --- TẠO GIAO DIỆN (ÉP BUỘC HIỂN THỊ) ---
+-- --- TẠO GIAO DIỆN ---
 local sg = Instance.new("ScreenGui")
 sg.Name = "MagicPlatformUI"
-sg.IgnoreGuiInset = true -- Bỏ qua các khoảng cách an toàn của hệ thống
-sg.DisplayOrder = 999999 -- Luôn nằm trên cùng các UI khác
+sg.IgnoreGuiInset = true
+sg.DisplayOrder = 999999
 sg.Parent = pGui
 
 local btn = Instance.new("TextButton")
 btn.Name = "MainToggle"
-btn.Size = UDim2.new(0, 160, 0, 55)
-btn.Position = UDim2.new(0.5, -80, 0.1, 0) -- Đặt ở chính giữa phía trên màn hình để dễ tìm
-btn.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-btn.BorderSizePixel = 3
-btn.BorderColor3 = Color3.fromRGB(255, 255, 255)
+btn.Size = UDim2.new(0, 160, 0, 50)
+btn.Position = UDim2.new(0.5, -80, 0.05, 0) -- Ở giữa phía trên
+btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 btn.Text = "PLATFORM: OFF"
-btn.Font = Enum.Font.SourceSansBold
-btn.TextSize = 20
+btn.Font = Enum.Font.GothamBold
+btn.TextSize = 18
 btn.TextColor3 = Color3.fromRGB(255, 50, 50)
-btn.ZIndex = 10
 btn.Parent = sg
 
 local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 12)
+corner.CornerRadius = UDim.new(0, 10)
 corner.Parent = btn
 
--- --- LOGIC BẬT TẮT ---
 btn.MouseButton1Click:Connect(function()
 	isEnabled = not isEnabled
-	
 	if isEnabled then
 		btn.Text = "PLATFORM: ON"
 		btn.TextColor3 = Color3.fromRGB(0, 255, 255)
-		btn.BorderColor3 = Color3.fromRGB(0, 255, 255)
 	else
 		btn.Text = "PLATFORM: OFF"
 		btn.TextColor3 = Color3.fromRGB(255, 50, 50)
-		btn.BorderColor3 = Color3.fromRGB(255, 255, 255)
 	end
-    
-    -- Hiệu ứng nhấn nút
-    btn:TweenSize(UDim2.new(0, 150, 0, 50), "Out", "Quad", 0.1, true)
-    task.wait(0.1)
-    btn:TweenSize(UDim2.new(0, 160, 0, 55), "Out", "Quad", 0.1, true)
 end)
 
--- --- LOGIC TẠO NỀN TẢNG ---
-RunService.Heartbeat:Connect(function()
-	if not isEnabled then return end
-	
-	local char = player.Character
-	local hrp = char and char:FindFirstChild("HumanoidRootPart")
-	
-	if hrp then
-		-- Chỉ tạo khi di chuyển hoặc nhảy
-		if (hrp.Position - lastPos).Magnitude > 2.5 then
-			local part = Instance.new("Part")
-			part.Size = Vector3.new(6, 0.6, 6)
-			part.Color = Color3.fromRGB(0, 255, 255)
-			part.Material = Enum.Material.Neon
-			part.Transparency = 0.4
-			part.Anchored = true
-			part.CanCollide = true
-			part.CastShadow = false
+-- --- LOGIC TẠO NỀN TẢNG (CHẠY THEO VÒNG LẶP THỜI GIAN) ---
+-- Sử dụng task.spawn để chạy vòng lặp riêng biệt, không bị ảnh hưởng bởi lag
+task.spawn(function()
+	while true do
+		task.wait(0.05) -- Tạo tấm đế mới mỗi 0.05 giây nếu đang bật
+		
+		if isEnabled then
+			local char = player.Character
+			local hrp = char and char:FindFirstChild("HumanoidRootPart")
 			
-			-- Vị trí dưới chân (3.2 là khoảng cách tiêu chuẩn)
-			part.Position = hrp.Position - Vector3.new(0, 3.2, 0)
-			part.Parent = workspace
-			
-			lastPos = hrp.Position
-			
-			-- Hiệu ứng biến mất
-			task.delay(0.4, function()
-				local tw = TweenService:Create(part, TweenInfo.new(0.3), {Transparency = 1, Size = Vector3.new(0,0,0)})
-				tw:Play()
-				tw.Completed:Wait()
-				part:Destroy()
-			end)
+			if hrp then
+				local part = Instance.new("Part")
+				part.Name = "FootPlatform"
+				part.Size = Vector3.new(6, 0.8, 6)
+				part.Color = Color3.fromRGB(0, 255, 255)
+				part.Material = Enum.Material.Neon
+				part.Transparency = 0.5
+				part.Anchored = true
+				part.CanCollide = true
+				part.CastShadow = false
+				
+				-- Đặt vị trí chính xác dưới chân (khoảng 3.6 đơn vị)
+				-- Nếu bạn thấy nó quá cao, hãy tăng số 3.6 lên thành 3.8 hoặc 4.0
+				part.Position = hrp.Position - Vector3.new(0, 3.6, 0)
+				
+				-- Cho vào Folder trong Workspace để gọn gàng
+				local folder = workspace:FindFirstChild("MagicSteps") or Instance.new("Folder", workspace)
+				folder.Name = "MagicSteps"
+				part.Parent = folder
+				
+				-- Hiệu ứng xóa bỏ
+				task.delay(0.3, function()
+					local tween = TweenService:Create(part, TweenInfo.new(0.2), {Transparency = 1, Size = Vector3.new(0, 0.8, 0)})
+					tween:Play()
+					tween.Completed:Wait()
+					part:Destroy()
+				end)
+			end
 		end
 	end
 end)

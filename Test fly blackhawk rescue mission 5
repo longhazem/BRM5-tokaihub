@@ -1,100 +1,100 @@
--- Script tạo nền tảng tự động có giao diện Bật/Tắt (Đã sửa lỗi vị trí UI)
+--[[ 
+    --uhsh--
+    SỐ THỨ TỰ: 01
+    CHỨC NĂNG: TẠO NỀN TẢNG DƯỚI CHÂN CÓ NÚT BẬT TẮT
+    --uhsh--
+]]
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
+local pGui = player:WaitForChild("PlayerGui")
 
--- --- CẤU HÌNH ---
-local PLATFORM_SIZE = Vector3.new(6, 0.5, 6)
-local PLATFORM_COLOR = Color3.fromRGB(0, 255, 255)
-local isEnabled = false 
+-- --- CÀI ĐẶT ---
+local isEnabled = false
+local lastPos = Vector3.new(0, 0, 0)
 
--- --- TẠO GIAO DIỆN (UI) ---
--- Xóa UI cũ nếu tồn tại để tránh trùng lặp
-if playerGui:FindFirstChild("PlatformControlGui") then
-	playerGui.PlatformControlGui:Destroy()
-end
+-- --- TẠO GIAO DIỆN (ÉP BUỘC HIỂN THỊ) ---
+local sg = Instance.new("ScreenGui")
+sg.Name = "MagicPlatformUI"
+sg.IgnoreGuiInset = true -- Bỏ qua các khoảng cách an toàn của hệ thống
+sg.DisplayOrder = 999999 -- Luôn nằm trên cùng các UI khác
+sg.Parent = pGui
 
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "PlatformControlGui"
-screenGui.ResetOnSpawn = false
-screenGui.DisplayOrder = 10 -- Đảm bảo hiện lên trên cùng
-screenGui.Parent = playerGui
+local btn = Instance.new("TextButton")
+btn.Name = "MainToggle"
+btn.Size = UDim2.new(0, 160, 0, 55)
+btn.Position = UDim2.new(0.5, -80, 0.1, 0) -- Đặt ở chính giữa phía trên màn hình để dễ tìm
+btn.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+btn.BorderSizePixel = 3
+btn.BorderColor3 = Color3.fromRGB(255, 255, 255)
+btn.Text = "PLATFORM: OFF"
+btn.Font = Enum.Font.SourceSansBold
+btn.TextSize = 20
+btn.TextColor3 = Color3.fromRGB(255, 50, 50)
+btn.ZIndex = 10
+btn.Parent = sg
 
-local mainButton = Instance.new("TextButton")
-mainButton.Name = "ToggleButton"
--- Đặt vị trí ở giữa bên trái màn hình để chắc chắn nhìn thấy
-mainButton.Size = UDim2.new(0, 150, 0, 50)
-mainButton.Position = UDim2.new(0, 20, 0.5, 0) 
-mainButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-mainButton.BackgroundTransparency = 0.3
-mainButton.Text = "PLATFORM: OFF"
-mainButton.TextColor3 = Color3.fromRGB(255, 0, 0)
-mainButton.Font = Enum.Font.GothamBlack
-mainButton.TextSize = 16
-mainButton.Parent = screenGui
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = btn
 
-local uiCorner = Instance.new("UICorner")
-uiCorner.CornerRadius = UDim.new(0, 10)
-uiCorner.Parent = mainButton
-
-local uiStroke = Instance.new("UIStroke") -- Thêm viền cho nút
-uiStroke.Thickness = 2
-uiStroke.Color = Color3.fromRGB(255, 255, 255)
-uiStroke.Parent = mainButton
-
--- Hiệu ứng UI
-local function updateUI()
-	if isEnabled then
-		mainButton.Text = "PLATFORM: ON"
-		mainButton.TextColor3 = Color3.fromRGB(0, 255, 255)
-		uiStroke.Color = Color3.fromRGB(0, 255, 255)
-	else
-		mainButton.Text = "PLATFORM: OFF"
-		mainButton.TextColor3 = Color3.fromRGB(255, 0, 0)
-		uiStroke.Color = Color3.fromRGB(255, 255, 255)
-	end
-end
-
-mainButton.MouseButton1Click:Connect(function()
+-- --- LOGIC BẬT TẮT ---
+btn.MouseButton1Click:Connect(function()
 	isEnabled = not isEnabled
-	updateUI()
+	
+	if isEnabled then
+		btn.Text = "PLATFORM: ON"
+		btn.TextColor3 = Color3.fromRGB(0, 255, 255)
+		btn.BorderColor3 = Color3.fromRGB(0, 255, 255)
+	else
+		btn.Text = "PLATFORM: OFF"
+		btn.TextColor3 = Color3.fromRGB(255, 50, 50)
+		btn.BorderColor3 = Color3.fromRGB(255, 255, 255)
+	end
+    
+    -- Hiệu ứng nhấn nút
+    btn:TweenSize(UDim2.new(0, 150, 0, 50), "Out", "Quad", 0.1, true)
+    task.wait(0.1)
+    btn:TweenSize(UDim2.new(0, 160, 0, 55), "Out", "Quad", 0.1, true)
 end)
 
 -- --- LOGIC TẠO NỀN TẢNG ---
-local function getRoot()
-	local char = player.Character
-	return char and char:FindFirstChild("HumanoidRootPart")
-end
-
-local lastPos = Vector3.new()
-
 RunService.Heartbeat:Connect(function()
 	if not isEnabled then return end
 	
-	local root = getRoot()
-	if root then
-		if (root.Position - lastPos).Magnitude > 3 then
-			local p = Instance.new("Part")
-			p.Size = PLATFORM_SIZE
-			p.Color = PLATFORM_COLOR
-			p.Material = Enum.Material.Neon
-			p.Transparency = 0.5
-			p.Anchored = true
-			p.CanCollide = true
-			p.Position = root.Position - Vector3.new(0, 3.5, 0)
-			p.Parent = workspace
+	local char = player.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	
+	if hrp then
+		-- Chỉ tạo khi di chuyển hoặc nhảy
+		if (hrp.Position - lastPos).Magnitude > 2.5 then
+			local part = Instance.new("Part")
+			part.Size = Vector3.new(6, 0.6, 6)
+			part.Color = Color3.fromRGB(0, 255, 255)
+			part.Material = Enum.Material.Neon
+			part.Transparency = 0.4
+			part.Anchored = true
+			part.CanCollide = true
+			part.CastShadow = false
 			
-			lastPos = root.Position
+			-- Vị trí dưới chân (3.2 là khoảng cách tiêu chuẩn)
+			part.Position = hrp.Position - Vector3.new(0, 3.2, 0)
+			part.Parent = workspace
 			
-			task.delay(0.5, function()
-				local t = TweenService:Create(p, TweenInfo.new(0.3), {Transparency = 1})
-				t:Play()
-				t.Completed:Wait()
-				p:Destroy()
+			lastPos = hrp.Position
+			
+			-- Hiệu ứng biến mất
+			task.delay(0.4, function()
+				local tw = TweenService:Create(part, TweenInfo.new(0.3), {Transparency = 1, Size = Vector3.new(0,0,0)})
+				tw:Play()
+				tw.Completed:Wait()
+				part:Destroy()
 			end)
 		end
 	end
 end)
+
+-- --uhsh-- KẾT THÚC --uhsh--

@@ -1,7 +1,7 @@
 --[[ 
     --uhsh--
-    SỐ THỨ TỰ: 06 (Bản lách Anti-Cheat bằng Lực Vật Lý)
-    CHỨC NĂNG: GIỮ NHÂN VẬT ĐỨNG YÊN TRÊN KHÔNG (KHÔNG TẠO PART)
+    SỐ THỨ TỰ: 08 (Bản mô phỏng theo cấu trúc Path trong Dex)
+    CHỨC NĂNG: TẠO CHUỖI "PATH" DƯỚI CHÂN NGƯỜI CHƠI
     --uhsh--
 ]]
 
@@ -9,89 +9,99 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
-local char = player.Character or player.CharacterAdded:Wait()
-local hrp = char:WaitForChild("HumanoidRootPart")
-local hum = char:WaitForChild("Humanoid")
+local pGui = player:WaitForChild("PlayerGui")
 
--- --- CẤU HÌNH ---
+-- --- CẤU HÌNH THEO ẢNH DEX ---
 local isEnabled = false
-local currentHeight = 0
-local bodyVelocity = nil
+local lastPos = Vector3.new(0, 0, 0)
 
--- --- TẠO GIAO DIỆN ---
+-- Thông số Part giống trong ảnh Properties bạn gửi
+local PART_NAME = "Path"
+local PART_COLOR = Color3.fromRGB(85, 255, 255) -- Màu Cyan giống ảnh
+local PART_SIZE = Vector3.new(8, 0.5, 8) -- Kích thước miếng nền
+local PART_TRANSPARENCY = 0.5
+local PART_MATERIAL = Enum.Material.Neon
+
+-- --- TẠO GIAO DIỆN (UI) ---
 local sg = Instance.new("ScreenGui")
-sg.Name = "BypassUI"
-sg.IgnoreGuiInset = true
-sg.DisplayOrder = 9999
-sg.Parent = player:WaitForChild("PlayerGui")
+sg.Name = "PathSystemGui"
+sg.ResetOnSpawn = false
+sg.DisplayOrder = 1000
+sg.Parent = pGui
 
 local btn = Instance.new("TextButton")
-btn.Size = UDim2.new(0, 180, 0, 50)
-btn.Position = UDim2.new(0.5, -90, 0.05, 0)
-btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-btn.Text = "FLY PLATFORM: OFF"
-btn.TextColor3 = Color3.fromRGB(255, 80, 80)
-btn.Font = Enum.Font.GothamBold
+btn.Name = "TogglePath"
+btn.Size = UDim2.new(0, 150, 0, 45)
+btn.Position = UDim2.new(0.5, -75, 0.02, 0)
+btn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+btn.BorderSizePixel = 2
+btn.BorderColor3 = Color3.fromRGB(0, 255, 255)
+btn.Text = "PLATFORM: ON" -- Đặt mặc định hoặc đổi sau
+btn.TextColor3 = Color3.fromRGB(0, 255, 255)
+btn.Font = Enum.Font.GothamBlack
 btn.TextSize = 16
 btn.Parent = sg
 
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 10)
-corner.Parent = btn
+Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
 
--- --- LOGIC ĐIỀU KHIỂN ---
-local function togglePlatform()
-    isEnabled = not isEnabled
+-- --- LOGIC TẠO PATH ---
+local function createPath(pos)
+    local pathPart = Instance.new("Part")
+    pathPart.Name = PART_NAME
+    pathPart.Size = PART_SIZE
+    pathPart.Color = PART_COLOR
+    pathPart.Material = PART_MATERIAL
+    pathPart.Transparency = PART_TRANSPARENCY
+    pathPart.Anchored = true
+    pathPart.CanCollide = true -- Quan trọng để đứng được
+    pathPart.CastShadow = false
     
-    if isEnabled then
-        btn.Text = "FLY PLATFORM: ON"
-        btn.TextColor3 = Color3.fromRGB(0, 255, 255)
-        currentHeight = hrp.Position.Y -- Khóa độ cao tại thời điểm bật
-        
-        -- Tạo lực giữ người không rơi
-        bodyVelocity = Instance.new("BodyVelocity")
-        bodyVelocity.Name = "AntiGravityForce"
-        bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-        bodyVelocity.MaxForce = Vector3.new(0, math.huge, 0) -- Chỉ khóa chiều dọc (Y)
-        bodyVelocity.Parent = hrp
-    else
-        btn.Text = "FLY PLATFORM: OFF"
-        btn.TextColor3 = Color3.fromRGB(255, 80, 80)
-        
-        if bodyVelocity then
-            bodyVelocity:Destroy()
-            bodyVelocity = nil
+    -- Đặt vị trí (trừ đi khoảng cách dưới chân)
+    pathPart.CFrame = CFrame.new(pos.X, pos.Y - 3.3, pos.Z)
+    
+    pathPart.Parent = game.Workspace
+    
+    -- Xóa sau một lúc giống như vòng lặp bạn mô tả
+    task.delay(0.5, function()
+        if pathPart then
+            pathPart:Destroy()
         end
-    end
+    end)
 end
 
-btn.MouseButton1Click:Connect(togglePlatform)
+-- --- BẬT TẮT ---
+btn.MouseButton1Click:Connect(function()
+    isEnabled = not isEnabled
+    if isEnabled then
+        btn.Text = "PLATFORM: ON"
+        btn.TextColor3 = Color3.fromRGB(0, 255, 255)
+        btn.BorderColor3 = Color3.fromRGB(0, 255, 255)
+    else
+        btn.Text = "PLATFORM: OFF"
+        btn.TextColor3 = Color3.fromRGB(255, 50, 50)
+        btn.BorderColor3 = Color3.fromRGB(255, 255, 255)
+    end
+end)
 
--- --- GIỮ ĐỘ CAO LIÊN TỤC ---
-RunService.RenderStepped:Connect(function()
-    if isEnabled and bodyVelocity and hrp then
-        -- Ép chiều cao nhân vật luôn bằng với lúc mới bật
-        -- Cách này giúp bạn đi trên không mà không cần block
-        local currentPos = hrp.Position
-        hrp.CFrame = CFrame.new(currentPos.X, currentHeight, currentPos.Z) * hrp.CFrame.Rotation
-        
-        -- Nếu bạn nhảy, chúng ta cập nhật lại độ cao mới
-        if hum.Jump then
-            task.wait(0.1)
-            currentHeight = hrp.Position.Y
+-- --- VÒNG LẶP KIỂM TRA ---
+RunService.Heartbeat:Connect(function()
+    if not isEnabled then return end
+    
+    local char = player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    
+    if hrp then
+        -- Tạo khi di chuyển hoặc nhảy (Khoảng cách giữa các miếng là 2 đơn vị)
+        if (hrp.Position - lastPos).Magnitude > 2 then
+            createPath(hrp.Position)
+            lastPos = hrp.Position
         end
     end
 end)
 
--- Cập nhật lại khi chết/hồi sinh
-player.CharacterAdded:Connect(function(newChar)
-    char = newChar
-    hrp = char:WaitForChild("HumanoidRootPart")
-    hum = char:WaitForChild("Humanoid")
-    if isEnabled then
-        isEnabled = false
-        togglePlatform()
-    end
+-- Cập nhật lại khi nhân vật hồi sinh
+player.CharacterAdded:Connect(function()
+    lastPos = Vector3.new(0,0,0)
 end)
 
 -- --uhsh-- KẾT THÚC --uhsh--

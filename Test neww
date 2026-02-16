@@ -489,4 +489,92 @@ visualTab:AddToggle("ESP Sphere (M:G, Z:R)", function(v)
     wallEnabled = v
     if wallEnabled then for _, d in pairs(activeNPCs) do createBoxForPart(d.head) end else destroyAllBoxes() end
 end)
-visualTab:AddToggle("Auto Fast Scan", function(v
+visualTab:AddToggle("Auto Fast Scan", function(v)
+    fastScanEnabled = v
+end)
+visualTab:AddToggle("FullBright", function(v)
+    fullBrightEnabled = v
+    if not v then for p, val in pairs(originalLighting) do lighting[p] = val end end
+end)
+
+local weaponTab = win:CreateTab("Weapons")
+weaponTab:AddToggle("Anti-Recoil", function(v) patchOptions.recoil = v patchWeapons(patchOptions) end)
+weaponTab:AddToggle("Unlock Firemodes", function(v) patchOptions.firemodes = v patchWeapons(patchOptions) end)
+
+local settingsTab = win:CreateTab("Settings")
+settingsTab:AddButton("Unload Script", function()
+    isUnloaded = true
+    destroyAllBoxes()
+    for m, _ in pairs(activeNPCs) do restoreOriginalSize(m) end
+    for _, c in ipairs(wallConnections) do pcall(function() c:Disconnect() end) end
+    rootGui:Destroy()
+end)
+
+-- [TỐI ƯU HÓA EXECUTION]
+-- 1. Quét NPC ban đầu với delay nhỏ để tránh treo khi mới vào game
+task.spawn(function()
+    local all = Workspace:GetChildren()
+    for i, m in ipairs(all) do
+        if m:IsA("Model") and isValidNPC(m) then addNPC(m) end
+        if i % 10 == 0 then task.wait() end -- Chia nhỏ tiến trình quét
+    end
+end)
+
+table.insert(wallConnections, Workspace.ChildAdded:Connect(function(m)
+    if m:IsA("Model") then 
+        task.delay(0.5, function() if isValidNPC(m) then addNPC(m) end end) 
+    end
+end))
+
+-- 2. Tối ưu vòng lặp Fast Scan (Chỉ chạy khi bật và có giới hạn thời gian nghỉ)
+task.spawn(function()
+    while not isUnloaded do
+        if fastScanEnabled then
+            local children = Workspace:GetChildren()
+            for i, m in ipairs(children) do
+                if not isUnloaded and fastScanEnabled then
+                    if m:IsA("Model") and not activeNPCs[m] then
+                        if isValidNPC(m) then addNPC(m) end
+                    end
+                    if i % 20 == 0 then task.wait() end -- Giảm tải cho CPU
+                end
+            end
+        end
+        task.wait(1) -- Quét lại mỗi giây thay vì dồn dập
+    end
+end)
+
+-- 3. Tối ưu RenderStepped (Chỉ xử lý logic thực sự cần thiết mỗi khung hình)
+RunService.RenderStepped:Connect(function()
+    if isUnloaded then return end
+    
+    if fullBrightEnabled then
+        lighting.Brightness = 2
+        lighting.ClockTime = 12
+        lighting.GlobalShadows = false
+        lighting.Ambient = Color3.new(1, 1, 1)
+    end
+    
+    for m, d in pairs(activeNPCs) do
+        if not m.Parent then 
+            activeNPCs[m] = nil 
+            continue 
+        end
+        
+        -- Logic Hitbox - Trái tim của script (Giữ nguyên logic gốc)
+        if silentEnabled then 
+            applySilentHitbox(m, d.root) 
+        end
+    end
+end)
+
+UserInputService.InputBegan:Connect(function(i, gp)
+    if not gp and i.KeyCode == Enum.KeyCode.Insert then
+        local mainFrame = rootGui:FindFirstChild("MainFrame")
+        if mainFrame then
+            mainFrame.Visible = not mainFrame.Visible
+        end
+    end
+end)
+
+print("Tokai Hub V6 Optimized Successfully.")

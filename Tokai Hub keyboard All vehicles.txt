@@ -1,0 +1,167 @@
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local StarterGui = game:GetService("StarterGui")
+
+local buttonsConfig = {
+    {Key = "W", Label = "W", Position = UDim2.new(0.15, 0, 0.30, 0)},
+    {Key = "A", Label = "A", Position = UDim2.new(0.05, 0, 0.47, 0)},
+    {Key = "S", Label = "S", Position = UDim2.new(0.15, 0, 0.60, 0)},
+    {Key = "D", Label = "D", Position = UDim2.new(0.25, 0, 0.47, 0)},
+    {Key = "Q", Label = "Q", Position = UDim2.new(0.05, 0, 0.30, 0)},
+    {Key = "E", Label = "E", Position = UDim2.new(0.25, 0, 0.30, 0)},
+    {Key = "LeftShift", Label = "Shift", Position = UDim2.new(0.8, 0, 0.65, 0)},
+    {Key = "Space", Label = "Space", Position = UDim2.new(0.8, 0, 0.45, 0)},
+    {Key = "X", Label = "X", Position = UDim2.new(0.9, 0, 0.4, 0)},
+}
+
+local parent = pcall(function() return CoreGui end) and CoreGui or Players.LocalPlayer:WaitForChild("PlayerGui")
+
+local screengui = Instance.new("ScreenGui")
+screengui.Name = "TOKAI hub keyboard brm5 pilot"
+screengui.ResetOnSpawn = false
+screengui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screengui.Parent = parent
+
+local keysContainer = Instance.new("Frame")
+keysContainer.Name = "KeysContainer"
+keysContainer.Size = UDim2.new(1, 0, 1, 0)
+keysContainer.BackgroundTransparency = 1
+keysContainer.Visible = false
+keysContainer.Parent = screengui
+
+local function makeDraggable(guiObject)
+    local dragging, dragInput, dragStart, startPos
+    local function update(input)
+        local delta = input.Position - dragStart
+        guiObject.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+    guiObject.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = guiObject.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    guiObject.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then update(input) end
+    end)
+end
+
+local toggleBtn = Instance.new("ImageButton")
+toggleBtn.Name = "ToggleKeyboard"
+toggleBtn.Size = UDim2.new(0, 45, 0, 45)
+toggleBtn.Position = UDim2.new(0.02, 0, 0.2, 0)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+toggleBtn.BorderSizePixel = 0
+toggleBtn.Parent = screengui
+
+local toggleCorner = Instance.new("UICorner")
+toggleCorner.CornerRadius = UDim.new(1, 0)
+toggleCorner.Parent = toggleBtn
+
+local toggleLabel = Instance.new("TextLabel")
+toggleLabel.Size = UDim2.new(1, 0, 1, 0)
+toggleLabel.BackgroundTransparency = 1
+toggleLabel.Text = "⌨"
+toggleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleLabel.TextSize = 25
+toggleLabel.Parent = toggleBtn
+
+local toggleStroke = Instance.new("UIStroke")
+toggleStroke.Color = Color3.fromRGB(255, 255, 255)
+toggleStroke.Thickness = 2
+toggleStroke.Parent = toggleBtn
+
+toggleBtn.MouseButton1Click:Connect(function()
+    keysContainer.Visible = not keysContainer.Visible
+    if keysContainer.Visible then
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    else
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+    end
+end)
+
+makeDraggable(toggleBtn)
+
+local function createKeyButton(config)
+    local keyCode = Enum.KeyCode[config.Key]
+    local frame = Instance.new("Frame")
+    frame.Name = "Key_" .. config.Key
+    frame.Size = UDim2.new(0, 50, 0, 50)
+    frame.Position = config.Position
+    frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    frame.BackgroundTransparency = 0.3
+    frame.BorderSizePixel = 0
+    frame.Parent = keysContainer
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0.25, 0)
+    corner.Parent = frame
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(255, 255, 255)
+    stroke.Thickness = 1.5
+    stroke.Transparency = 0.5
+    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    stroke.Parent = frame
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = config.Label
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 18
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.Parent = frame
+
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = ""
+    btn.Parent = frame
+
+    btn.MouseButton1Down:Connect(function()
+        TweenService:Create(frame, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(150, 150, 150)}):Play()
+        VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
+    end)
+
+    btn.MouseButton1Up:Connect(function()
+        TweenService:Create(frame, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(20, 20, 20)}):Play()
+        VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
+    end)
+    
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(frame, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(20, 20, 20)}):Play()
+    end)
+end
+
+for _, cfg in ipairs(buttonsConfig) do
+    createKeyButton(cfg)
+end
+
+task.spawn(function()
+    local function notify(title, text, duration)
+        pcall(function()
+            StarterGui:SetCore("SendNotification", {
+                Title = title;
+                Text = text;
+                Duration = duration or 5;
+            })
+        end)
+    end
+
+    notify("TOKAI Hub", "Script Loaded Successfully!", 5)
+    task.wait(1)
+    notify("Support", "Discord: discord.gg/nn783R2fK2", 60)
+end)

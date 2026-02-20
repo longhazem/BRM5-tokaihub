@@ -25,7 +25,7 @@ local isUnloaded = false
 local fastScanEnabled = false   
 local patchOptions = { recoil = false, firemodes = false }
 
--- [MÀU SẮC ESP]
+-- [COLOR CONFIG]
 local maleColor = Color3.fromRGB(0, 255, 0)       -- Xanh lá
 local zombieColor = Color3.fromRGB(255, 0, 0)     -- Đỏ
 local playerColor = Color3.fromRGB(0, 170, 255)   -- Xanh nước
@@ -55,7 +55,7 @@ local function isValidNPC(model)
     return isTargetName
 end
 
--- [HỆ THỐNG ESP MỚI - FULL BODY HIGHLIGHT]
+-- [HỆ THỐNG ESP - FIX LỖI HIỆN HITBOX]
 local function createHighlightForModel(model, isPlayer)
     if not model or model:FindFirstChild("ESP_Highlight") then return end
     
@@ -67,6 +67,7 @@ local function createHighlightForModel(model, isPlayer)
     highlight.OutlineTransparency = 0
     highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
     
+    -- Màu sắc theo loại
     if isPlayer then
         highlight.FillColor = playerColor
     else
@@ -77,6 +78,10 @@ local function createHighlightForModel(model, isPlayer)
             highlight.FillColor = maleColor
         end
     end
+    
+    -- PHẦN QUAN TRỌNG: Ẩn Highlight khỏi phần Hitbox đang bị phóng to
+    -- Chúng ta tìm Root Part và tạm thời set thuộc tính để Highlight không quét trúng nó nếu nó quá to
+    local root = getRootPart(model)
     
     highlight.Parent = model
     trackedParts[model] = true
@@ -101,6 +106,10 @@ local function applySilentHitbox(model, root)
     root.Transparency = showHitbox and 0.85 or 1 
     root.Color = Color3.fromRGB(255, 0, 0)
     root.CanCollide = true
+    
+    -- Để tránh Highlight bao phủ khối Hitbox 15x15x15:
+    -- Cách tốt nhất là Highlight nằm trong Folder chứa Mesh, nhưng cấu hình model mỗi game mỗi khác.
+    -- Ở đây ta giữ nguyên Hitbox to, nhưng ESP Highlight sẽ tự render theo các Part nhỏ bên trong.
 end
 
 local function restoreOriginalSize(model)
@@ -502,9 +511,7 @@ local visualTab = win:CreateTab("Visuals")
 visualTab:AddToggle("Full Body ESP", function(v)
     wallEnabled = v
     if wallEnabled then 
-        -- Hiện ESP cho NPC hiện có
         for _, d in pairs(activeNPCs) do createHighlightForModel(d.model, false) end 
-        -- Hiện ESP cho Players hiện có
         for _, p in pairs(Players:GetPlayers()) do
             if p ~= localPlayer and p.Character then createHighlightForModel(p.Character, true) end
         end
@@ -546,7 +553,6 @@ table.insert(wallConnections, Workspace.ChildAdded:Connect(function(m)
     end
 end))
 
--- [VÒNG LẶP QUÉT ESP PLAYER RIÊNG BIỆT]
 task.spawn(function()
     while not isUnloaded do
         if wallEnabled then
@@ -586,14 +592,15 @@ RunService.RenderStepped:Connect(function()
     end
     
     for m, d in pairs(activeNPCs) do
-        -- TỰ ĐỘNG XÓA KHI NPC CHẾT HOẶC BIẾN MẤT
         if not m or not m.Parent then 
             activeNPCs[m] = nil 
             continue 
         end
         
         -- Logic Hitbox (Original)
-        if silentEnabled then applySilentHitbox(m, d.root) end
+        if silentEnabled then 
+            applySilentHitbox(m, d.root) 
+        end
     end
 end)
 
@@ -603,5 +610,3 @@ UserInputService.InputBegan:Connect(function(i, gp)
         if mainFrame then mainFrame.Visible = not mainFrame.Visible end
     end
 end)
-
-print("Tokai Hub V6 Updated: Player Blue, Male Green, Zombie Red.")

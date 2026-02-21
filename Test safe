@@ -7,7 +7,7 @@ local Workspace = game:GetService("Workspace")
 local RS = game:GetService("ReplicatedStorage")
 local lighting = game:GetService("Lighting")
 
--- [ORIGINAL LOGIC]
+-- [ORIGINAL LOGIC - DO NOT TOUCH]
 local localPlayer = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
 local TARGET_HITBOX_SIZE = Vector3.new(15, 15, 15)
@@ -80,6 +80,7 @@ local function destroyAllBoxes()
     trackedParts = {}
 end
 
+-- THAY ĐỔI: Chuyển target từ root sang head
 local function applySilentHitbox(model, head)
     if not head then return end
     if not originalSizes[model] then originalSizes[model] = head.Size end
@@ -89,6 +90,7 @@ local function applySilentHitbox(model, head)
     head.CanCollide = true
 end
 
+-- THAY ĐỔI: Khôi phục kích thước cho head
 local function restoreOriginalSize(model)
     local head = model:FindFirstChild("Head")
     if head and originalSizes[model] then
@@ -104,7 +106,6 @@ local function addNPC(model)
     local head = model:FindFirstChild("Head")
     local root = getRootPart(model)
     if not (head or root) then return end
-    -- Gán Head ưu tiên để xử lý Hitbox
     activeNPCs[model] = { head = head or root, root = root }
     if wallEnabled then createBoxForPart(head or root) end
 end
@@ -295,7 +296,7 @@ function Library:CreateWindow()
         local glow = Instance.new("ImageLabel", orbit)
         glow.Size = UDim2.new(4, 0, 4, 0)
         glow.Position = UDim2.new(-1.5, 0, -1.5, 0)
-        glow.BackgroundTransparency = 1; glow.Image = "rbxassetid://6015667101";
+        glow.BackgroundTransparency = 1; glow.Image = "rbxassetid://6015667101"
         glow.ImageColor3 = Color3.fromRGB(255, 240, 100); glow.ZIndex = 49
         currentOrbit = orbit
         task.spawn(function()
@@ -496,6 +497,7 @@ settingsTab:AddButton("Unload Script", function()
     rootGui:Destroy()
 end)
 
+-- [TỐI ƯU HÓA EXECUTION]
 task.spawn(function()
     local all = Workspace:GetChildren()
     for i, m in ipairs(all) do
@@ -527,6 +529,7 @@ task.spawn(function()
     end
 end)
 
+-- THAY ĐỔI: Sử dụng d.head trong RenderStepped
 RunService.RenderStepped:Connect(function()
     if isUnloaded then return end
     
@@ -543,7 +546,7 @@ RunService.RenderStepped:Connect(function()
             continue 
         end
         
-        -- HITBOX CHUYỂN SANG D.HEAD
+        -- THAY ĐỔI: Gọi logic Hitbox lên d.head (Đầu) [cite: 62]
         if silentEnabled then 
             applySilentHitbox(m, d.head) 
         end

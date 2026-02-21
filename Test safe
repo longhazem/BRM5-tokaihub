@@ -7,7 +7,7 @@ local Workspace = game:GetService("Workspace")
 local RS = game:GetService("ReplicatedStorage")
 local lighting = game:GetService("Lighting")
 
--- [VARIABLES]
+-- [ORIGINAL LOGIC - DO NOT TOUCH]
 local localPlayer = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
 local TARGET_HITBOX_SIZE = Vector3.new(15, 15, 15)
@@ -20,14 +20,13 @@ local wallEnabled = false
 local silentEnabled = false     
 local showHitbox = false        
 local fullBrightEnabled = false 
+
 local isUnloaded = false        
 local fastScanEnabled = false   
 local patchOptions = { recoil = false, firemodes = false }
 
--- [COLORS]
 local maleColor = Color3.fromRGB(0, 255, 0)
 local zombieColor = Color3.fromRGB(255, 0, 0)
-local playerColor = Color3.fromRGB(0, 170, 255)
 
 local originalLighting = {
     Brightness = lighting.Brightness,
@@ -37,7 +36,6 @@ local originalLighting = {
     Ambient = lighting.Ambient
 }
 
--- [FUNCTIONS]
 local function getRootPart(model)
     return model:FindFirstChild("Root") or model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("UpperTorso")
 end
@@ -55,70 +53,51 @@ local function isValidNPC(model)
     return isTargetName
 end
 
--- [FIXED ESP LOGIC]
-local function createHighlightForModel(model, isPlayer)
-    if not model or model:FindFirstChild("ESP_Highlight") then return end
+local function createBoxForPart(part)
+    if not part or part:FindFirstChild("Wall_Box") then return end
+    local sphere = Instance.new("SphereHandleAdornment")
+    sphere.Name = "Wall_Box"
+    sphere.Radius = 1.2
+    sphere.Adornee = part
+    sphere.AlwaysOnTop = true 
+    sphere.ZIndex = 10
+    sphere.Transparency = 0.1
     
-    local highlight = Instance.new("Highlight")
-    highlight.Name = "ESP_Highlight"
-    highlight.Adornee = model
-    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    highlight.FillTransparency = 0.5
-    highlight.OutlineTransparency = 0
-    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-    
-    if isPlayer then
-        highlight.FillColor = playerColor
-    else
+    local model = part.Parent
+    if model then
         local name = model.Name:lower()
-        if name == "zombie" or name == "zombies" then
-            highlight.FillColor = zombieColor
-        else
-            highlight.FillColor = maleColor
-        end
+        sphere.Color3 = (name == "zombie" or name == "zombies") and zombieColor or maleColor
     end
-    highlight.Parent = model
-    trackedParts[model] = true
+    
+    sphere.Parent = part
+    trackedParts[part] = true
 end
 
-local function destroyAllHighlights()
-    for model, _ in pairs(trackedParts) do
-        if model and model:FindFirstChild("ESP_Highlight") then pcall(function() model.ESP_Highlight:Destroy() end) end
+local function destroyAllBoxes()
+    for part, _ in pairs(trackedParts) do
+        if part and part:FindFirstChild("Wall_Box") then pcall(function() part.Wall_Box:Destroy() end) end
     end
     trackedParts = {}
-    for _, player in pairs(Players:GetPlayers()) do
-        if player.Character and player.Character:FindFirstChild("ESP_Highlight") then
-            pcall(function() player.Character.ESP_Highlight:Destroy() end)
-        end
-    end
 end
 
--- [FIXED HITBOX LOGIC: TÁCH BIỆT KHỎI ESP]
-local function applySilentHitbox(model, root)
-    if not root then return end
-    
-    local hb = model:FindFirstChild("RealHitbox")
-    if not hb then
-        hb = Instance.new("Part")
-        hb.Name = "RealHitbox"
-        hb.CanCollide = false
-        hb.Anchored = false
-        hb.Transparency = 1
-        hb.Parent = model
-        
-        local weld = Instance.new("Weld", hb)
-        weld.Part0 = hb
-        weld.Part1 = root
-        weld.C0 = CFrame.new(0, 0, 0)
-    end
+-- ĐÃ CHỈNH SỬA: Chỉnh hitbox cho Head thay vì Root
+local function applySilentHitbox(model, headPart)
+    if not headPart then return end
+    if not originalSizes[headPart] then originalSizes[headPart] = headPart.Size end
+    headPart.Size = TARGET_HITBOX_SIZE
+    headPart.Transparency = showHitbox and 0.85 or 0 -- Giữ Head nếu showHitbox tắt thì để 0 (hoặc 1 tùy ý bạn)
+    headPart.Color = Color3.fromRGB(255, 0, 0)
+    headPart.CanCollide = true
+end
 
-    if silentEnabled then
-        hb.Size = TARGET_HITBOX_SIZE
-        hb.Transparency = showHitbox and 0.8 or 1
-        hb.Color = Color3.fromRGB(255, 0, 0)
-    else
-        hb.Size = Vector3.new(1, 1, 1)
-        hb.Transparency = 1
+-- ĐÃ CHỈNH SỬA: Khôi phục lại Head
+local function restoreOriginalSize(model)
+    local data = activeNPCs[model]
+    if data and data.head and originalSizes[data.head] then
+        data.head.Size = originalSizes[data.head]
+        data.head.Transparency = 0 -- Trả về mặc định
+        data.head.CanCollide = true
+        originalSizes[data.head] = nil
     end
 end
 
@@ -127,12 +106,16 @@ local function addNPC(model)
     local head = model:FindFirstChild("Head")
     local root = getRootPart(model)
     if not (head or root) then return end
-    activeNPCs[model] = { head = head or root, root = root, model = model }
-    if wallEnabled then createHighlightForModel(model, false) end
+    activeNPCs[model] = { head = head or root, root = root }
+    if wallEnabled then createBoxForPart(head or root) end
 end
 
 local function patchWeapons(options)
-    local weaponsFolder = RS:FindFirstChild("Shared") and RS.Shared:FindFirstChild("Configs") and RS.Shared.Configs:FindFirstChild("Weapon") and RS.Shared.Configs.Weapon:FindFirstChild("Weapons_Player")
+    local weaponsFolder = RS:FindFirstChild("Shared")
+        and RS.Shared:FindFirstChild("Configs")
+        and RS.Shared.Configs:FindFirstChild("Weapon")
+        and RS.Shared.Configs.Weapon:FindFirstChild("Weapons_Player")
+  
     if not weaponsFolder then return end
     for _, platform in pairs(weaponsFolder:GetChildren()) do
         if platform.Name:match("^Platform_") then
@@ -312,9 +295,9 @@ function Library:CreateWindow()
         orbit.Parent = targetBtn
         Instance.new("UICorner", orbit).CornerRadius = UDim.new(1, 0)
         local glow = Instance.new("ImageLabel", orbit)
-        glow.Size = UDim2.new(4, 0, 4, 0)
+        glow.Size = UDim2.new(4, 0, 4, 0);
         glow.Position = UDim2.new(-1.5, 0, -1.5, 0)
-        glow.BackgroundTransparency = 1; glow.Image = "rbxassetid://6015667101"
+        glow.BackgroundTransparency = 1; glow.Image = "rbxassetid://6015667101";
         glow.ImageColor3 = Color3.fromRGB(255, 240, 100); glow.ZIndex = 49
         currentOrbit = orbit
         task.spawn(function()
@@ -352,7 +335,7 @@ function Library:CreateWindow()
         tabBtn.ZIndex = 15
         Instance.new("UICorner", tabBtn)
         local tabStroke = Instance.new("UIStroke", tabBtn)
-        tabStroke.Thickness = 0
+        tabStroke.Thickness = 0;
         tabStroke.Color = Color3.fromRGB(255, 245, 150)
 
         tabBtn.MouseButton1Click:Connect(function()
@@ -393,23 +376,25 @@ function Library:CreateWindow()
             Instance.new("UICorner", toggleFrame)
             
             local label = Instance.new("TextLabel", toggleFrame)
-            label.Size = UDim2.new(1, -60, 1, 0)
+            label.Size = UDim2.new(1, -60, 1, 0);
             label.Position = UDim2.new(0, 15, 0, 0)
-            label.BackgroundTransparency = 1
+            label.BackgroundTransparency = 1;
             label.Text = text; label.TextColor3 = Color3.fromRGB(255, 255, 255)
-            label.Font = Enum.Font.Gotham; label.TextSize = 13
-            label.TextXAlignment = Enum.TextXAlignment.Left; label.ZIndex = 26
+            label.Font = Enum.Font.Gotham;
+            label.TextSize = 13; label.TextXAlignment = Enum.TextXAlignment.Left; label.ZIndex = 26
 
             local tglBg = Instance.new("Frame", toggleFrame)
-            tglBg.Size = UDim2.new(0, 42, 0, 22)
+            tglBg.Size = UDim2.new(0, 42, 0, 22);
             tglBg.Position = UDim2.new(1, -52, 0.5, -11)
-            tglBg.BackgroundColor3 = Color3.fromRGB(60, 60, 60); tglBg.ZIndex = 26
+            tglBg.BackgroundColor3 = Color3.fromRGB(60, 60, 60);
+            tglBg.ZIndex = 26
             Instance.new("UICorner", tglBg).CornerRadius = UDim.new(1, 0)
 
             local tglDot = Instance.new("Frame", tglBg)
-            tglDot.Size = UDim2.new(0, 18, 0, 18)
+            tglDot.Size = UDim2.new(0, 18, 0, 18);
             tglDot.Position = UDim2.new(0, 2, 0.5, -9)
-            tglDot.BackgroundColor3 = Color3.fromRGB(255, 255, 255); tglDot.ZIndex = 27
+            tglDot.BackgroundColor3 = Color3.fromRGB(255, 255, 255);
+            tglDot.ZIndex = 27
             Instance.new("UICorner", tglDot).CornerRadius = UDim.new(1, 0)
 
             local enabled = false
@@ -432,8 +417,9 @@ function Library:CreateWindow()
             btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
             btn.Text = "  " .. text
             btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            btn.Font = Enum.Font.Gotham; btn.TextSize = 13
-            btn.TextXAlignment = Enum.TextXAlignment.Left; btn.ZIndex = 25
+            btn.Font = Enum.Font.Gotham;
+            btn.TextSize = 13; btn.TextXAlignment = Enum.TextXAlignment.Left
+            btn.ZIndex = 25
             Instance.new("UICorner", btn)
             btn.MouseButton1Click:Connect(function()
                 PlayCustomClick()
@@ -444,11 +430,12 @@ function Library:CreateWindow()
     end
 
     local closeBtn = Instance.new("TextButton", main)
-    closeBtn.Size = UDim2.new(0, 30, 0, 30)
+    closeBtn.Size = UDim2.new(0, 30, 0, 30);
     closeBtn.Position = UDim2.new(1, -35, 0, 5)
-    closeBtn.BackgroundTransparency = 1; closeBtn.Text = "×"
+    closeBtn.BackgroundTransparency = 1; closeBtn.Text = "×";
     closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    closeBtn.TextSize = 25; closeBtn.ZIndex = 50
+    closeBtn.TextSize = 25;
+    closeBtn.ZIndex = 50
     closeBtn.MouseButton1Click:Connect(function()
         PlayCustomClick()
         TweenService:Create(main, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0)}):Play()
@@ -472,7 +459,8 @@ function Library:CreateWindow()
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
         end)
     end
-    Drag(main); Drag(openBtn)
+    Drag(main);
+    Drag(openBtn)
 
     openBtn.MouseButton1Click:Connect(function()
         PlayCustomClick(); openBtn.Visible = false; main.Visible = true
@@ -484,7 +472,7 @@ function Library:CreateWindow()
         local h = 0
         while screenGui.Parent do
             h = h + 1/400; local c = Color3.fromHSV(h%1, 0.6, 1)
-            mainStroke.Color = c; openStroke.Color = c; logoStroke.Color = c; logoStroke.Color = c
+            mainStroke.Color = c; openStroke.Color = c; logoStroke.Color = c
             RunService.RenderStepped:Wait()
         end
     end)()
@@ -499,18 +487,13 @@ combatTab:AddToggle("Silent Hitbox (All NPCs)", function(v) silentEnabled = v en
 combatTab:AddToggle("Show Hitbox", function(v) showHitbox = v end)
 
 local visualTab = win:CreateTab("Visuals")
-visualTab:AddToggle("Full Body ESP", function(v)
+visualTab:AddToggle("ESP Sphere (M:G, Z:R), function(v)
     wallEnabled = v
-    if wallEnabled then 
-        for _, d in pairs(activeNPCs) do createHighlightForModel(d.model, false) end 
-        for _, p in pairs(Players:GetPlayers()) do
-            if p ~= localPlayer and p.Character then createHighlightForModel(p.Character, true) end
-        end
-    else 
-        destroyAllHighlights() 
-    end
+    if wallEnabled then for _, d in pairs(activeNPCs) do createBoxForPart(d.head) end else destroyAllBoxes() end
 end)
-visualTab:AddToggle("Auto Fast Scan", function(v) fastScanEnabled = v end)
+visualTab:AddToggle("Auto Fast Scan", function(v)
+    fastScanEnabled = v
+end)
 visualTab:AddToggle("FullBright", function(v)
     fullBrightEnabled = v
     if not v then for p, val in pairs(originalLighting) do lighting[p] = val end end
@@ -523,12 +506,13 @@ weaponTab:AddToggle("Unlock Firemodes", function(v) patchOptions.firemodes = v p
 local settingsTab = win:CreateTab("Settings")
 settingsTab:AddButton("Unload Script", function()
     isUnloaded = true
-    destroyAllHighlights()
+    destroyAllBoxes()
+    for m, _ in pairs(activeNPCs) do restoreOriginalSize(m) end
     for _, c in ipairs(wallConnections) do pcall(function() c:Disconnect() end) end
     rootGui:Destroy()
 end)
 
--- [EXECUTION LOGIC]
+-- [EXECUTION]
 task.spawn(function()
     local all = Workspace:GetChildren()
     for i, m in ipairs(all) do
@@ -542,17 +526,6 @@ table.insert(wallConnections, Workspace.ChildAdded:Connect(function(m)
         task.delay(0.5, function() if isValidNPC(m) then addNPC(m) end end) 
     end
 end))
-
-task.spawn(function()
-    while not isUnloaded do
-        if wallEnabled then
-            for _, p in pairs(Players:GetPlayers()) do
-                if p ~= localPlayer and p.Character then createHighlightForModel(p.Character, true) end
-            end
-        end
-        task.wait(2)
-    end
-end)
 
 task.spawn(function()
     while not isUnloaded do
@@ -575,25 +548,37 @@ RunService.RenderStepped:Connect(function()
     if isUnloaded then return end
     
     if fullBrightEnabled then
-        lighting.Brightness = 2; lighting.ClockTime = 12
-        lighting.GlobalShadows = false; lighting.Ambient = Color3.new(1, 1, 1)
+        lighting.Brightness = 2
+        lighting.ClockTime = 12
+        lighting.GlobalShadows = false
+        lighting.Ambient = Color3.new(1, 1, 1)
     end
     
     for m, d in pairs(activeNPCs) do
-        if not m or not m.Parent then 
+        if not m.Parent then 
             activeNPCs[m] = nil 
             continue 
         end
-        applySilentHitbox(m, d.root)
+        
+        -- ĐÃ CHỈNH SỬA: Áp dụng lên d.head thay vì d.root
+        if silentEnabled then 
+            applySilentHitbox(m, d.head) 
+        else
+            -- Nếu tắt Silent, khôi phục lại size ban đầu của đầu
+            if originalSizes[d.head] then
+                restoreOriginalSize(m)
+            end
+        end
     end
 end)
 
 UserInputService.InputBegan:Connect(function(i, gp)
     if not gp and i.KeyCode == Enum.KeyCode.Insert then
         local mainFrame = rootGui:FindFirstChild("MainFrame")
-        if mainFrame then mainFrame.Visible = not mainFrame.Visible end
+        if mainFrame then
+            mainFrame.Visible = not mainFrame.Visible
+        end
     end
 end)
 
-print("Tokai Hub V6 FIXED: ESP is now separated from Hitbox.")
-          
+print("Tokai Hub V6 - Head Hitbox Mode Loaded.")

@@ -1,12 +1,11 @@
--- [TOKAI HUB FIXED - REPAIRED INTERACTION]
-print("Fixing UI Interaction issues...")
+-- [TOKAI HUB - FINAL VERSION WITH TOGGLE BUTTON]
+print("Loading Tokai Hub with Toggle Button...")
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
-local RS = game:GetService("ReplicatedStorage")
 local lighting = game:GetService("Lighting")
 
 -- SETTINGS
@@ -17,282 +16,263 @@ local TARGET_HITBOX_SIZE = Vector3.new(15, 15, 15)
 local activeNPCs = {}
 local trackedParts = {}
 local originalSizes = {}
-local wallConnections = {}
-
 local wallEnabled = false
 local silentEnabled = false
-local showHitbox = false
 local fullBrightEnabled = false
 local isUnloaded = false
-local patchOptions = { recoil = false, firemodes = false }
 
 local visibleColor = Color3.fromRGB(0, 255, 0)
 local hiddenColor = Color3.fromRGB(255, 0, 0)
 
-local originalLighting = {
-    Brightness = lighting.Brightness,
-    ClockTime = lighting.ClockTime,
-    FogEnd = lighting.FogEnd,
-    GlobalShadows = lighting.GlobalShadows,
-    Ambient = lighting.Ambient
-}
-
--- [LOGIC FUNCTIONS]
-local function getRootPart(model)
-    return model:FindFirstChild("Root") or model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("UpperTorso")
-end
-
-local function isValidNPC(model)
-    local name = model.Name:lower()
-    if name == "male" or name == "zombie" or name == "zombies" then
-        if name == "male" then
-            for _, c in ipairs(model:GetChildren()) do
-                if type(c.Name) == "string" and c.Name:sub(1, 3) == "AI_" then return true end
-            end
-            return false
-        end
-        return true
-    end
-    return false
-end
-
-local function createBoxForPart(part)
-    if not part or part:FindFirstChild("Wall_Box") then return end
-    local box = Instance.new("BoxHandleAdornment")
-    box.Name = "Wall_Box"
-    box.Size = part.Size + Vector3.new(0.2, 0.2, 0.2)
-    box.Adornee = part
-    box.AlwaysOnTop = true
-    box.ZIndex = 10
-    box.Transparency = 0.3
-    box.Parent = part
-    trackedParts[part] = true
-end
-
-local function destroyAllBoxes()
-    for part, _ in pairs(trackedParts) do
-        if part and part:FindFirstChild("Wall_Box") then pcall(function() part.Wall_Box:Destroy() end) end
-    end
-    trackedParts = {}
-end
-
-local function applySilentHitbox(model, root)
-    if not originalSizes[model] then originalSizes[model] = root.Size end
-    root.Size = TARGET_HITBOX_SIZE
-    root.Transparency = showHitbox and 0.85 or 1
-    root.CanCollide = true
-end
-
-local function restoreOriginalSize(model)
-    local root = getRootPart(model)
-    if root and originalSizes[model] then
-        root.Size = originalSizes[model]
-        root.Transparency = 1
-        root.CanCollide = false
-    end
-    originalSizes[model] = nil
-end
-
-local function addNPC(model)
-    if activeNPCs[model] or not isValidNPC(model) then return end
-    local head = model:FindFirstChild("Head") or getRootPart(model)
-    local root = getRootPart(model)
-    if not (head and root) then return end
-    activeNPCs[model] = { head = head, root = root }
-    if wallEnabled then createBoxForPart(head) end
-end
-
--- [GUI SYSTEM]
-local function CleanupUI()
-    local old = (gethui and gethui():FindFirstChild("TOKAI_FIXED")) or game.CoreGui:FindFirstChild("TOKAI_FIXED")
+-- [CLEANUP]
+local function Cleanup()
+    local old = (gethui and gethui():FindFirstChild("TOKAI_V8")) or game.CoreGui:FindFirstChild("TOKAI_V8")
     if old then old:Destroy() end
 end
-CleanupUI()
+Cleanup()
 
-local function MakeDraggable(frame, dragHandle)
-    local dragging, dragInput, dragStart, startPos
-    dragHandle.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            dragStart = input.Position
-            startPos = frame.Position
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = input.Position - dragStart
-            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
-    end)
+-- [GUI SETUP]
+local sg = Instance.new("ScreenGui")
+sg.Name = "TOKAI_V8"
+sg.Parent = (gethui and gethui()) or game.CoreGui
+sg.ResetOnSpawn = false
+sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+-- [MAIN FRAME]
+local main = Instance.new("Frame", sg)
+main.Name = "MainFrame"
+main.Size = UDim2.new(0, 500, 0, 320)
+main.Position = UDim2.new(0.5, -250, 0.5, -160)
+main.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+main.BorderSizePixel = 0
+main.Active = true
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 8)
+
+-- [TOGGLE BUTTON - NÚT MỞ MENU]
+local openBtn = Instance.new("TextButton", sg)
+openBtn.Name = "OpenButton"
+openBtn.Size = UDim2.new(0, 50, 0, 50)
+openBtn.Position = UDim2.new(0, 20, 0.5, -25)
+openBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+openBtn.Text = "T" -- Chữ T đại diện cho Tokai
+openBtn.TextColor3 = Color3.fromRGB(255, 245, 150)
+openBtn.Font = "GothamBold"
+openBtn.TextSize = 20
+openBtn.Visible = false -- Ẩn khi menu đang mở
+Instance.new("UICorner", openBtn).CornerRadius = UDim.new(1, 0)
+local openStroke = Instance.new("UIStroke", openBtn)
+openStroke.Thickness = 2
+openStroke.Color = Color3.fromRGB(255, 245, 150)
+
+-- [DRAG LOGIC - KÉO MENU]
+local dragging, dragInput, dragStart, startPos
+local function updateDrag(input)
+    local delta = input.Position - dragStart
+    main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 end
 
-local Library = {}
-function Library:CreateWindow()
-    local sg = Instance.new("ScreenGui")
-    sg.Name = "TOKAI_FIXED"
-    sg.Parent = (gethui and gethui()) or game.CoreGui
-    sg.DisplayOrder = 100
+main.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = main.Position
+    end
+end)
 
-    local main = Instance.new("Frame", sg)
-    main.Name = "Main"
-    main.Size = UDim2.new(0, 520, 0, 340)
-    main.Position = UDim2.new(0.5, -260, 0.5, -170)
-    main.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
-    main.BorderSizePixel = 0
-    main.Active = true -- Rất quan trọng để chặn input xuyên thấu
-    Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
-    local stroke = Instance.new("UIStroke", main)
-    stroke.Thickness = 2
-    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        updateDrag(input)
+    end
+end)
 
-    local sidebar = Instance.new("Frame", main)
-    sidebar.Size = UDim2.new(0, 140, 1, 0)
-    sidebar.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
-    sidebar.BorderSizePixel = 0
-    Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 10)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
 
-    local tabContainer = Instance.new("ScrollingFrame", sidebar)
-    tabContainer.Size = UDim2.new(1, 0, 1, -60)
-    tabContainer.Position = UDim2.new(0, 0, 0, 50)
-    tabContainer.BackgroundTransparency = 1
-    tabContainer.ScrollBarThickness = 0
-    local tabLayout = Instance.new("UIListLayout", tabContainer)
-    tabLayout.Padding = UDim.new(0, 5)
-    tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+-- [CLOSE LOGIC]
+local function toggleUI()
+    local isVisible = main.Visible
+    main.Visible = not isVisible
+    openBtn.Visible = isVisible -- Hiện nút tròn khi Menu ẩn và ngược lại
+end
 
-    local pages = Instance.new("Frame", main)
-    pages.Size = UDim2.new(1, -160, 1, -20)
-    pages.Position = UDim2.new(0, 150, 0, 10)
-    pages.BackgroundTransparency = 1
+openBtn.MouseButton1Click:Connect(toggleUI)
 
-    local first = true
-    function Library:CreateTab(name)
-        local page = Instance.new("ScrollingFrame", pages)
-        page.Size = UDim2.new(1, 0, 1, 0)
-        page.Visible = false
-        page.BackgroundTransparency = 1
-        page.ScrollBarThickness = 2
-        Instance.new("UIListLayout", page).Padding = UDim.new(0, 8)
+-- [SIDEBAR]
+local sidebar = Instance.new("Frame", main)
+sidebar.Size = UDim2.new(0, 130, 1, 0)
+sidebar.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+sidebar.BorderSizePixel = 0
+Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 8)
 
-        local btn = Instance.new("TextButton", tabContainer)
-        btn.Size = UDim2.new(0, 120, 0, 32)
-        btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-        btn.Text = name
-        btn.TextColor3 = Color3.fromRGB(200, 200, 200)
-        btn.Font = "GothamSemibold"
-        btn.TextSize = 12
-        Instance.new("UICorner", btn)
+local title = Instance.new("TextLabel", sidebar)
+title.Size = UDim2.new(1, 0, 0, 40)
+title.Text = "TOKAI HUB"
+title.TextColor3 = Color3.fromRGB(255, 245, 150)
+title.Font = "GothamBold"
+title.TextSize = 14
+title.BackgroundTransparency = 1
 
-        btn.MouseButton1Click:Connect(function()
-            for _, p in pairs(pages:GetChildren()) do if p:IsA("ScrollingFrame") then p.Visible = false end end
-            for _, b in pairs(tabContainer:GetChildren()) do if b:IsA("TextButton") then b.BackgroundColor3 = Color3.fromRGB(30, 30, 30) end end
-            page.Visible = true
-            btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+local tabList = Instance.new("ScrollingFrame", sidebar)
+tabList.Size = UDim2.new(1, 0, 1, -50)
+tabList.Position = UDim2.new(0, 0, 0, 40)
+tabList.BackgroundTransparency = 1
+tabList.ScrollBarThickness = 0
+local layout = Instance.new("UIListLayout", tabList)
+layout.Padding = UDim.new(0, 5)
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+local pages = Instance.new("Frame", main)
+pages.Size = UDim2.new(1, -140, 1, -20)
+pages.Position = UDim2.new(0, 135, 0, 10)
+pages.BackgroundTransparency = 1
+
+-- [BUILDER FUNCTIONS]
+local function CreateTab(name, isFirst)
+    local page = Instance.new("ScrollingFrame", pages)
+    page.Size = UDim2.new(1, 0, 1, 0)
+    page.Visible = isFirst or false
+    page.BackgroundTransparency = 1
+    page.ScrollBarThickness = 2
+    Instance.new("UIListLayout", page).Padding = UDim.new(0, 8)
+
+    local btn = Instance.new("TextButton", tabList)
+    btn.Size = UDim2.new(0, 110, 0, 35)
+    btn.BackgroundColor3 = isFirst and Color3.fromRGB(40, 40, 40) or Color3.fromRGB(25, 25, 25)
+    btn.Text = name
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = "GothamSemibold"
+    btn.TextSize = 12
+    Instance.new("UICorner", btn)
+
+    btn.MouseButton1Click:Connect(function()
+        for _, p in pairs(pages:GetChildren()) do if p:IsA("ScrollingFrame") then p.Visible = false end end
+        for _, b in pairs(tabList:GetChildren()) do if b:IsA("TextButton") then b.BackgroundColor3 = Color3.fromRGB(25, 25, 25) end end
+        page.Visible = true
+        btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    end)
+
+    local items = {}
+    function items:AddToggle(text, callback)
+        local tgl = Instance.new("TextButton", page)
+        tgl.Size = UDim2.new(1, -10, 0, 40)
+        tgl.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        tgl.Text = "  " .. text
+        tgl.TextColor3 = Color3.new(1, 1, 1)
+        tgl.TextXAlignment = "Left"
+        tgl.Font = "Gotham"
+        tgl.TextSize = 13
+        Instance.new("UICorner", tgl)
+        
+        local state = false
+        tgl.MouseButton1Click:Connect(function()
+            state = not state
+            tgl.BackgroundColor3 = state and Color3.fromRGB(255, 245, 150) or Color3.fromRGB(30, 30, 30)
+            tgl.TextColor3 = state and Color3.new(0,0,0) or Color3.new(1,1,1)
+            callback(state)
         end)
-
-        if first then page.Visible = true; btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60); first = false end
-
-        local elements = {}
-        function elements:AddToggle(text, callback)
-            local tgl = Instance.new("TextButton", page)
-            tgl.Size = UDim2.new(1, -10, 0, 38)
-            tgl.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
-            tgl.Text = "  " .. text
-            tgl.TextColor3 = Color3.new(1, 1, 1)
-            tgl.TextXAlignment = "Left"
-            tgl.Font = "Gotham"
-            tgl.TextSize = 13
-            Instance.new("UICorner", tgl)
-            local state = false
-            tgl.MouseButton1Click:Connect(function()
-                state = not state
-                tgl.BackgroundColor3 = state and Color3.fromRGB(100, 100, 255) or Color3.fromRGB(28, 28, 28)
-                callback(state)
-            end)
-        end
-
-        function elements:AddSlider(text, min, max, init, callback)
-            local sFrame = Instance.new("Frame", page)
-            sFrame.Size = UDim2.new(1, -10, 0, 45)
-            sFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-            Instance.new("UICorner", sFrame)
-            local lbl = Instance.new("TextLabel", sFrame)
-            lbl.Text = "  " .. text .. ": " .. init; lbl.Size = UDim2.new(1, 0, 0, 20)
-            lbl.TextColor3 = Color3.new(1, 1, 1); lbl.BackgroundTransparency = 1; lbl.TextXAlignment = "Left"; lbl.Font = "Gotham"; lbl.TextSize = 12
-            local bar = Instance.new("Frame", sFrame)
-            bar.Size = UDim2.new(0.9, 0, 0, 6); bar.Position = UDim2.new(0.05, 0, 0.7, 0); bar.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-            local fill = Instance.new("Frame", bar); fill.Size = UDim2.new((init-min)/(max-min), 0, 1, 0); fill.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
-            local dragging = false
-            local function update()
-                local p = math.clamp((UserInputService:GetMouseLocation().X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
-                local val = math.floor(min + (p * (max - min)))
-                fill.Size = UDim2.new(p, 0, 1, 0); lbl.Text = "  " .. text .. ": " .. val; callback(val)
-            end
-            bar.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true update() end end)
-            UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
-            RunService.RenderStepped:Connect(function() if dragging then update() end end)
-        end
-        return elements
+    end
+    
+    function items:AddButton(text, callback)
+        local b = Instance.new("TextButton", page)
+        b.Size = UDim2.new(1, -10, 0, 40)
+        b.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        b.Text = text; b.TextColor3 = Color3.new(1,1,1)
+        Instance.new("UICorner", b)
+        b.MouseButton1Click:Connect(callback)
     end
 
-    MakeDraggable(main, sidebar)
-
-    task.spawn(function()
-        local h = 0
-        while sg.Parent do
-            h = h + 1/300; stroke.Color = Color3.fromHSV(h%1, 0.7, 1)
-            RunService.RenderStepped:Wait()
-        end
-    end)
-    return Library, sg
+    return items
 end
 
--- INITIALIZE
-local win, root = Library:CreateWindow()
-local combat = win:CreateTab("Combat")
+-- [TABS DEFINITION]
+local combat = CreateTab("Combat", true)
 combat:AddToggle("Silent Hitbox", function(v) silentEnabled = v end)
 
-local visual = win:CreateTab("Visuals")
-visual:AddToggle("ESP Raycast", function(v)
+local visual = CreateTab("Visuals", false)
+visual:AddToggle("ESP Wallhack", function(v)
     wallEnabled = v
-    if v then for _, d in pairs(activeNPCs) do createBoxForPart(d.head) end else destroyAllBoxes() end
+    if not v then
+        for part, _ in pairs(trackedParts) do
+            if part and part:FindFirstChild("Wall_Box") then part.Wall_Box:Destroy() end
+        end
+        trackedParts = {}
+    end
 end)
-visual:AddToggle("FullBright", function(v)
-    fullBrightEnabled = v
-    if not v then for p, val in pairs(originalLighting) do lighting[p] = val end end
+visual:AddToggle("FullBright", function(v) fullBrightEnabled = v end)
+
+local settings = CreateTab("Settings", false)
+settings:AddButton("Close Menu", toggleUI)
+settings:AddButton("Unload Script", function()
+    isUnloaded = true
+    sg:Destroy()
 end)
 
-local colors = win:CreateTab("Colors")
-colors:AddSlider("Visible R", 0, 255, 0, function(v) visibleColor = Color3.fromRGB(v, visibleColor.G * 255, visibleColor.B * 255) end)
-colors:AddSlider("Visible G", 0, 255, 255, function(v) visibleColor = Color3.fromRGB(visibleColor.R * 255, v, visibleColor.B * 255) end)
+-- [GAME LOGIC]
+local function isValidNPC(m)
+    return (m:IsA("Model") and (m.Name == "Male" or m.Name == "Zombie"))
+end
 
--- DETECTION
-for _, m in ipairs(Workspace:GetChildren()) do if m:IsA("Model") and isValidNPC(m) then addNPC(m) end end
-Workspace.ChildAdded:Connect(function(m) if m:IsA("Model") then task.wait(0.5); addNPC(m) end end)
+local function addNPC(m)
+    local root = m:FindFirstChild("HumanoidRootPart") or m:FindFirstChild("Root")
+    local head = m:FindFirstChild("Head")
+    if root and head then
+        activeNPCs[m] = {root = root, head = head}
+    end
+end
 
--- RUNNER
+Workspace.ChildAdded:Connect(function(m)
+    task.wait(0.5)
+    if isValidNPC(m) then addNPC(m) end
+end)
+
+for _, m in pairs(Workspace:GetChildren()) do if isValidNPC(m) then addNPC(m) end end
+
 RunService.RenderStepped:Connect(function()
     if isUnloaded then return end
+    
     if fullBrightEnabled then
-        lighting.Brightness = 2; lighting.ClockTime = 12; lighting.Ambient = Color3.new(1, 1, 1)
+        lighting.Brightness = 2
+        lighting.ClockTime = 12
     end
+
     for m, d in pairs(activeNPCs) do
         if not m.Parent then activeNPCs[m] = nil continue end
-        if wallEnabled and d.head and d.head:FindFirstChild("Wall_Box") then
+        
+        -- ESP Logic
+        if wallEnabled and d.head then
+            if not d.head:FindFirstChild("Wall_Box") then
+                local box = Instance.new("BoxHandleAdornment", d.head)
+                box.Name = "Wall_Box"
+                box.Size = d.head.Size + Vector3.new(0.2, 0.2, 0.2)
+                box.Adornee = d.head
+                box.AlwaysOnTop = true
+                box.ZIndex = 5
+                box.Transparency = 0.5
+                trackedParts[d.head] = true
+            end
+            
+            -- Raycast color check
             local origin = camera.CFrame.Position
-            local rp = RaycastParams.new()
-            rp.FilterType = Enum.RaycastFilterType.Blacklist
-            rp.FilterDescendantsInstances = {localPlayer.Character, d.head, m}
-            local r = Workspace:Raycast(origin, d.head.Position - origin, rp)
-            d.head.Wall_Box.Color3 = (not r) and visibleColor or hiddenColor
+            local ray = Workspace:Raycast(origin, d.head.Position - origin, RaycastParams.new())
+            d.head.Wall_Box.Color3 = (not ray) and visibleColor or hiddenColor
         end
-        if silentEnabled then applySilentHitbox(m, d.root) end
+
+        -- Silent Hitbox
+        if silentEnabled and d.root then
+            if not originalSizes[m] then originalSizes[m] = d.root.Size end
+            d.root.Size = TARGET_HITBOX_SIZE
+            d.root.CanCollide = true
+        elseif originalSizes[m] then
+            d.root.Size = originalSizes[m]
+            originalSizes[m] = nil
+        end
     end
 end)
 
+-- Toggle bằng phím
 UserInputService.InputBegan:Connect(function(i, gp)
-    if not gp and i.KeyCode == Enum.KeyCode.Insert then root.Enabled = not root.Enabled end
+    if not gp and i.KeyCode == Enum.KeyCode.Insert then toggleUI() end
 end)

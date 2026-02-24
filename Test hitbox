@@ -1,0 +1,86 @@
+-- Clears the console output before starting the script
+print("Starting script...")
+if typeof(clear) == "function" then clear() end
+
+-- SERVICES: Getting the basic tools from Roblox to interact with the game
+local Players = game:GetService("Players")           -- To get info about players
+local RunService = game:GetService("RunService")     -- To run code every frame (very fast)
+local Workspace = game:GetService("Workspace")       -- To access the 3D world objects
+
+-- SETTINGS & VARIABLES
+local localPlayer = Players.LocalPlayer
+
+local TARGET_HITBOX_SIZE = Vector3.new(15, 15, 15) -- Size of the modified hitboxes (bigger = easier to hit)
+
+local activeNPCs = {}      -- List of enemies currently in the game
+local originalSizes = {}   -- Storage for original sizes to restore them later
+local wallConnections = {} -- List of technical connections to clean up later
+
+-- TOGGLES (Đã bật sẵn thành true vì không còn GUI)
+local silentEnabled = true     -- Makes targets bigger
+local showHitbox = true       -- Shows the big hitbox box
+
+--- HELPER FUNCTIONS ---
+
+-- Finds the main part of a character (Root)
+local function getRootPart(model)
+    return model:FindFirstChild("Root") or model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("UpperTorso")
+end
+
+-- Checks if the model is an AI/NPC enemy
+local function hasAIChild(model)
+    for _, c in ipairs(model:GetChildren()) do
+        if type(c.Name) == "string" and c.Name:sub(1, 3) == "AI_" then return true end
+    end
+    return false
+end
+
+-- Makes the NPC hitboxes larger (Silent Aim effect)
+local function applySilentHitbox(model, root)
+    if not originalSizes[model] then originalSizes[model] = root.Size end
+    root.Size = TARGET_HITBOX_SIZE
+    root.Transparency = showHitbox and 0.85 or 1 -- If showHitbox is true, you'll see a faint box
+    root.CanCollide = true
+end
+
+-- Restores hitboxes to their normal size
+local function restoreOriginalSize(model)
+    local root = getRootPart(model)
+    if root and originalSizes[model] then
+        root.Size = originalSizes[model]
+        root.Transparency = 1
+        root.CanCollide = false
+    end
+    originalSizes[model] = nil
+end
+
+-- Adds an enemy to our tracking list
+local function addNPC(model)
+    if activeNPCs[model] or model.Name ~= "Male" or not hasAIChild(model) then return end
+    local head = model:FindFirstChild("Head")
+    local root = getRootPart(model)
+    if not head or not root then return end
+    activeNPCs[model] = { head = head, root = root }
+end
+
+--- MAIN GAME LOOPS ---
+
+-- Detect NPCs already in game
+for _, m in ipairs(Workspace:GetChildren()) do
+    if m:IsA("Model") and m.Name == "Male" then if hasAIChild(m) then addNPC(m) end end
+end
+
+-- Detect new NPCs when they spawn
+table.insert(wallConnections, Workspace.ChildAdded:Connect(function(m)
+    if m:IsA("Model") and m.Name == "Male" then 
+        task.delay(0.2, function() if hasAIChild(m) then addNPC(m) end end) 
+    end
+end))
+
+-- Continuous loop for Hitbox checks
+RunService.RenderStepped:Connect(function()
+    for m, d in pairs(activeNPCs) do
+        -- Apply larger hitboxes if enabled
+        if silentEnabled then applySilentHitbox(m, d.root) end
+    end
+end)

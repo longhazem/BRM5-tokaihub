@@ -58,9 +58,9 @@ end
 local function addNPC(model)
     if activeNPCs[model] or model.Name ~= "Male" or not hasAIChild(model) then return end
     local head = model:FindFirstChild("Head")
-    local root = getRootPart(model)
-    if not head or not root then return end
-    activeNPCs[model] = { head = head, root = root }
+    local head = getHeadPart(model)
+    if not head or not head then return end
+    activeNPCs[model] = { head = head, head = head }
 end
 
 --- MAIN GAME LOOPS ---

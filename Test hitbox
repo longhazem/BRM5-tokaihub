@@ -60,7 +60,7 @@ local function addNPC(model)
     local head = model:FindFirstChild("Head")
     local root = getRootPart(model)
     if not head or not root then return end
-    activeNPCs[model] = { head = head, head = head }
+    activeNPCs[model] = { head = head, root = root }
 end
 
 --- MAIN GAME LOOPS ---
@@ -81,6 +81,6 @@ end))
 RunService.RenderStepped:Connect(function()
     for m, d in pairs(activeNPCs) do
         -- Apply larger hitboxes if enabled
-        if silentEnabled then applySilentHitbox(m, d.root) end
+        if silentEnabled then applySilentHitbox(m, d.head) end
     end
 end)

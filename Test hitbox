@@ -22,9 +22,9 @@ local showHitbox = true       -- Shows the big hitbox box
 
 --- HELPER FUNCTIONS ---
 
--- Finds the main part of a character (Head)
+-- Finds the main part of a character (Root)
 local function getRootPart(model)
-    return model:FindFirstChild("Head") or model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("UpperTorso")
+    return model:FindFirstChild("Root") or model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("UpperTorso")
 end
 
 -- Checks if the model is an AI/NPC enemy
@@ -36,20 +36,20 @@ local function hasAIChild(model)
 end
 
 -- Makes the NPC hitboxes larger (Silent Aim effect)
-local function applySilentHitbox(model, Head)
-    if not originalSizes[model] then originalSizes[model] = head.Size end
-    head.Size = TARGET_HITBOX_SIZE
-    head.Transparency = showHitbox and 0.85 or 1 -- If showHitbox is true, you'll see a faint box
-    head.CanCollide = true
+local function applySilentHitbox(model, root)
+    if not originalSizes[model] then originalSizes[model] = root.Size end
+    root.Size = TARGET_HITBOX_SIZE
+    root.Transparency = showHitbox and 0.85 or 1 -- If showHitbox is true, you'll see a faint box
+    root.CanCollide = true
 end
 
 -- Restores hitboxes to their normal size
 local function restoreOriginalSize(model)
-    local head = getHeadPart(model)
-    if head and originalSizes[model] then
-        head.Size = originalSizes[model]
-        head.Transparency = 1
-        head.CanCollide = true
+    local root = getRootPart(model)
+    if root and originalSizes[model] then
+        root.Size = originalSizes[model]
+        root.Transparency = 1
+        root.CanCollide = false
     end
     originalSizes[model] = nil
 end
@@ -58,9 +58,11 @@ end
 local function addNPC(model)
     if activeNPCs[model] or model.Name ~= "Male" or not hasAIChild(model) then return end
     local head = model:FindFirstChild("Head")
-    local head = getHeadPart(model)
-    if not head or not head then return end
-    activeNPCs[model] = { head = head, head = head }
+    local realRoot = getRootPart(model)
+    if not head or not realRoot then return end
+    
+    -- Gán 'head' vào vị trí 'root' trong bảng để các hàm thực thi tác động lên Head
+    activeNPCs[model] = { head = realRoot, root = head }
 end
 
 --- MAIN GAME LOOPS ---
@@ -81,6 +83,6 @@ end))
 RunService.RenderStepped:Connect(function()
     for m, d in pairs(activeNPCs) do
         -- Apply larger hitboxes if enabled
-        if silentEnabled then applySilentHitbox(m, d.head) end
+        if silentEnabled then applySilentHitbox(m, d.root) end
     end
 end)

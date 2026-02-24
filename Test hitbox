@@ -1,31 +1,26 @@
 -- Clears the console output before starting the script
-print("Starting script...")
+print("Starting script with Head Hitbox...")
 if typeof(clear) == "function" then clear() end
 
 -- SERVICES: Getting the basic tools from Roblox to interact with the game
-local Players = game:GetService("Players")           -- To get info about players
-local RunService = game:GetService("RunService")     -- To run code every frame (very fast)
-local Workspace = game:GetService("Workspace")       -- To access the 3D world objects
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
 -- SETTINGS & VARIABLES
 local localPlayer = Players.LocalPlayer
 
-local TARGET_HITBOX_SIZE = Vector3.new(15, 15, 15) -- Size of the modified hitboxes (bigger = easier to hit)
+local TARGET_HITBOX_SIZE = Vector3.new(15, 15, 15) -- Kích thước hitbox mới cho đầu
 
 local activeNPCs = {}      -- List of enemies currently in the game
 local originalSizes = {}   -- Storage for original sizes to restore them later
 local wallConnections = {} -- List of technical connections to clean up later
 
--- TOGGLES (Đã bật sẵn thành true vì không còn GUI)
-local silentEnabled = true     -- Makes targets bigger
-local showHitbox = true       -- Shows the big hitbox box
+-- TOGGLES
+local silentEnabled = true     
+local showHitbox = false       
 
 --- HELPER FUNCTIONS ---
-
--- Finds the main part of a character (Root)
-local function getRootPart(model)
-    return model:FindFirstChild("Root") or model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("UpperTorso")
-end
 
 -- Checks if the model is an AI/NPC enemy
 local function hasAIChild(model)
@@ -35,32 +30,30 @@ local function hasAIChild(model)
     return false
 end
 
--- Makes the NPC hitboxes larger (Silent Aim effect)
-local function applySilentHitbox(model, root)
-    if not originalSizes[model] then originalSizes[model] = root.Size end
-    root.Size = TARGET_HITBOX_SIZE
-    root.Transparency = showHitbox and 0.85 or 1 -- If showHitbox is true, you'll see a faint box
-    root.CanCollide = true
+-- Makes the NPC HEAD larger
+local function applySilentHitbox(model, head)
+    if not originalSizes[head] then originalSizes[head] = head.Size end
+    head.Size = TARGET_HITBOX_SIZE
+    head.Transparency = showHitbox and 0.85 or 0 -- Giữ hiển thị hoặc tàng hình tùy showHitbox
+    head.CanCollide = true
 end
 
--- Restores hitboxes to their normal size
-local function restoreOriginalSize(model)
-    local root = getRootPart(model)
-    if root and originalSizes[model] then
-        root.Size = originalSizes[model]
-        root.Transparency = 1
-        root.CanCollide = false
+-- Restores head to its normal size
+local function restoreOriginalSize(head)
+    if head and originalSizes[head] then
+        head.Size = originalSizes[head]
+        head.Transparency = 0
+        head.CanCollide = true -- Mặc định của Head thường là true
     end
-    originalSizes[model] = nil
+    originalSizes[head] = nil
 end
 
 -- Adds an enemy to our tracking list
 local function addNPC(model)
     if activeNPCs[model] or model.Name ~= "Male" or not hasAIChild(model) then return end
     local head = model:FindFirstChild("Head")
-    local root = getRootPart(model)
-    if not head or not root then return end
-    activeNPCs[model] = { head = head, root = root }
+    if not head then return end
+    activeNPCs[model] = { head = head }
 end
 
 --- MAIN GAME LOOPS ---
@@ -80,7 +73,9 @@ end))
 -- Continuous loop for Hitbox checks
 RunService.RenderStepped:Connect(function()
     for m, d in pairs(activeNPCs) do
-        -- Apply larger hitboxes if enabled
-        if silentEnabled then applySilentHitbox(m, d.root) end
+        -- Apply larger hitboxes TO HEAD if enabled
+        if silentEnabled and d.head then 
+            applySilentHitbox(m, d.head) 
+        end
     end
 end)

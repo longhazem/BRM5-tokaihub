@@ -486,7 +486,7 @@ function Library:CreateWindow()
     local closeBtn = Instance.new("TextButton", main)
     closeBtn.Size = UDim2.new(0, 30, 0, 30);
     closeBtn.Position = UDim2.new(1, -35, 0, 5)
-    closeBtn.BackgroundTransparency = 1; closeBtn.Text = "×";
+    closeBtn.BackgroundTransparency = 1; closeBtn.Text = "x";
     closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     closeBtn.TextSize = 25;
     closeBtn.ZIndex = 50
@@ -496,4 +496,153 @@ function Library:CreateWindow()
         task.delay(0.4, function() main.Visible = false; openBtn.Visible = true end)
     end)
 
+    local function Drag(obj)
+        local dragging, dragInput, dragStart, startPos
+        obj.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true; dragStart = input.Position; startPos = obj.Position
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local delta = input.Position - dragStart
+                obj.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end)
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
+        end)
+    end
+    Drag(main);
+    Drag(openBtn)
+
+    openBtn.MouseButton1Click:Connect(function()
+        PlayCustomClick(); openBtn.Visible = false; main.Visible = true
+        main.Position = UDim2.new(0.5, 0, 0.5, 0)
+        TweenService:Create(main, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = mainSize}):Play()
+    end)
+
+    coroutine.wrap(function()
+        local h = 0
+        while screenGui.Parent do
+            h = h + 1/400; local c = Color3.fromHSV(h%1, 0.6, 1)
+            mainStroke.Color = c; openStroke.Color = c; logoStroke.Color = c
+            RunService.RenderStepped:Wait()
+        end
+    end)()
+    return Library, screenGui
+end
+
+-- [MAIN INITIALIZATION]
+local currentToggleKey = Enum.KeyCode.Insert
+local win, rootGui = Library:CreateWindow()
+
+local combatTab = win:CreateTab("Combat")
+combatTab:AddToggle("Silent Hitbox (All NPCs)", function(v) silentEnabled = v end)
+combatTab:AddToggle("Show Hitbox", function(v) showHitbox = v end)
+
+local visualTab = win:CreateTab("Visuals")
+visualTab:AddToggle("ESP Sphere (M:G, Z:R)", function(v)
+    wallEnabled = v
+    if wallEnabled then for _, d in pairs(activeNPCs) do createBoxForPart(d.head) end else destroyAllBoxes() end
+end)
+visualTab:AddToggle("Auto Fast Scan", function(v)
+    fastScanEnabled = v
+end)
+visualTab:AddToggle("FullBright", function(v)
+    fullBrightEnabled = v
+    if not v then for p, val in pairs(originalLighting) do lighting[p] = val end end
+end)
+
+-- Chức năng xóa sương mù yêu cầu
+local noFogConnection = nil
+visualTab:AddToggle("No Fog", function(v)
+    local atmosphere = lighting:FindFirstChildOfClass("Atmosphere")
+    if atmosphere then
+        if v then
+            atmosphere.Density = 0
+            noFogConnection = atmosphere:GetPropertyChangedSignal("Density"):Connect(function()
+                atmosphere.Density = 0
+            end)
+        else
+            if noFogConnection then
+                noFogConnection:Disconnect()
+                noFogConnection = nil
+            end
+        end
+    end
+end)
+
+local weaponTab = win:CreateTab("Weapons")
+weaponTab:AddToggle("Anti-Recoil", function(v) patchOptions.recoil = v patchWeapons(patchOptions) end)
+weaponTab:AddToggle("Unlock Firemodes", function(v) patchOptions.firemodes = v patchWeapons(patchOptions) end)
+
+local settingsTab = win:CreateTab("Settings")
+settingsTab:AddKeybind("Toggle UI Key", currentToggleKey, function(newKey)
+    currentToggleKey = newKey
+end)
+
+settingsTab:AddButton("Unload Script", function()
+    isUnloaded = true
+    destroyAllBoxes()
+    for m, _ in pairs(activeNPCs) do restoreOriginalSize(m) end
+    for _, c in ipairs(wallConnections) do pcall(function() c:Disconnect() end) end
+    if noFogConnection then noFogConnection:Disconnect() end
+    rootGui:Destroy()
+end)
+
+-- [SYSTEM LOOPS]
+task.spawn(function()
+    local all = Workspace:GetChildren()
+    for i, m in ipairs(all) do
+        if m:IsA("Model") and isValidNPC(m) then addNPC(m) end
+        if i % 10 == 0 then task.wait() end 
+    end
+end)
+
+table.insert(wallConnections, Workspace.ChildAdded:Connect(function(m)
+    if m:IsA("Model") then 
+        task.delay(0.5, function() if isValidNPC(m) then addNPC(m) end end) 
+    end
+end))
+
+task.spawn(function()
+    while not isUnloaded do
+        if fastScanEnabled then
+            local children = Workspace:GetChildren()
+            for i, m in ipairs(children) do
+                if not isUnloaded and fastScanEnabled then
+                    if m:IsA("Model") and not activeNPCs[m] then
+                        if isValidNPC(m) then addNPC(m) end
+                    end
+                    if i % 20 == 0 then task.wait() end 
+                end
+            end
+        end
+        task.wait(1) 
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if isUnloaded then return end
+    if fullBrightEnabled then
+        lighting.Brightness = 2
+        lighting.ClockTime = 12
+        lighting.GlobalShadows = false
+        lighting.Ambient = Color3.new(1, 1, 1)
+    end
+    for m, d in pairs(activeNPCs) do
+        if not m.Parent then activeNPCs[m] = nil continue end
+        if silentEnabled then applySilentHitbox(m, d.root) end
+    end
+end)
+
+UserInputService.InputBegan:Connect(function(i, gp)
+    if not gp and i.KeyCode == currentToggleKey then
+        local mainFrame = rootGui:FindFirstChild("MainFrame")
+        if mainFrame then mainFrame.Visible = not mainFrame.Visible end
+    end
+end)
+
+print("Tokai Hub Download successful and the horse will kick you")
    

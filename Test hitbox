@@ -10,7 +10,7 @@ local Workspace = game:GetService("Workspace")       -- To access the 3D world o
 -- SETTINGS & VARIABLES
 local localPlayer = Players.LocalPlayer
 
-local TARGET_HITBOX_SIZE = Vector3.new(30, 30, 30) -- Size of the modified hitboxes (bigger = easier to hit)
+local TARGET_HITBOX_SIZE = Vector3.new(20, 20, 20) -- Size of the modified hitboxes (bigger = easier to hit)
 
 local activeNPCs = {}      -- List of enemies currently in the game
 local originalSizes = {}   -- Storage for original sizes to restore them later

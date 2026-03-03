@@ -1,0 +1,94 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local VIM = game:GetService("VirtualInputManager")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
+local camera = workspace.CurrentCamera
+
+local flying = false
+local speed = 70
+local flyVelocity = nil
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CustomController"
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 110, 0, 120)
+mainFrame.Position = UDim2.new(0.1, 0, 0.5, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BackgroundTransparency = 0.3
+mainFrame.Active = true
+mainFrame.Draggable = true 
+mainFrame.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner", mainFrame)
+
+local btnW = Instance.new("TextButton")
+btnW.Size = UDim2.new(0, 90, 0, 40)
+btnW.Position = UDim2.new(0, 10, 0, 15)
+btnW.Text = "W (Giữ)"
+btnW.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+btnW.TextColor3 = Color3.new(1, 1, 1)
+btnW.Parent = mainFrame
+
+local btnFly = Instance.new("TextButton")
+btnFly.Size = UDim2.new(0, 90, 0, 40)
+btnFly.Position = UDim2.new(0, 10, 0, 65)
+btnFly.Text = "N: TẮT"
+btnFly.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+btnFly.TextColor3 = Color3.new(1, 1, 1)
+btnFly.Parent = mainFrame
+
+local function ToggleFly(enabled)
+    flying = enabled
+    if not flying then
+        if flyVelocity then flyVelocity:Destroy() end
+        flyVelocity = nil
+        humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+        btnFly.Text = "N: TẮT"
+        btnFly.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+    else
+        if not flyVelocity then
+            flyVelocity = Instance.new("BodyVelocity")
+            flyVelocity.MaxForce = Vector3.new(1, 1, 1) * 10^6
+            flyVelocity.Parent = rootPart
+        end
+        humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+        btnFly.Text = "N: BAY"
+        btnFly.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+    end
+end
+
+btnW.MouseButton1Down:Connect(function()
+    btnW.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    btnW.TextColor3 = Color3.new(0, 0, 0)
+    VIM:SendKeyEvent(true, Enum.KeyCode.W, false, game)
+end)
+
+btnW.MouseButton1Up:Connect(function()
+    btnW.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    btnW.TextColor3 = Color3.new(1, 1, 1)
+    VIM:SendKeyEvent(false, Enum.KeyCode.W, false, game)
+end)
+
+btnFly.MouseButton1Click:Connect(function()
+    ToggleFly(not flying)
+end)
+
+UIS.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Enum.KeyCode.N then
+        ToggleFly(not flying)
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if flying and flyVelocity then
+        flyVelocity.Velocity = camera.CFrame.LookVector * speed
+    end
+end)

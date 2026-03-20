@@ -1,4 +1,4 @@
--- [[ OYB HUB - UNIVERSAL SECURE KEY SYSTEM ]]
+
 -- Supports: PC & Mobile (Delta, Velocity, Fluxus, Hydrogen, etc.)
 -- Custom Version for YouTube Tutorial
 
@@ -12,7 +12,7 @@ local lEncode, lDecode, lDigest = a3, aw, Z;
 --! CONFIGURATION (REPLACED FOR SECURITY)
 -------------------------------------------------------------------------------
 local service = 0
-local secret = "YOUR_SECRET_HERE"
+local secret = "eb9b9028-8b83-4ee1-9d1a-119dc1a54ada"
 local useNonce = true;
 local mainScriptURL = "Script_link"
 

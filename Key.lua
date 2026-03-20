@@ -83,7 +83,7 @@ end
 --! MODERN UI DESIGN
 -------------------------------------------------------------------------------
 local function StartMainScript()
-    _G.Secret = true 
+    _G.Longtokaiaishiteru = true 
     loadstring(game:HttpGet(mainScriptURL))()
 end
 

@@ -1,10 +1,10 @@
 -- ==========================================
--- CẤU HÌNH HỆ THỐNG (Thay đổi thông tin ở đây)
+-- CẤU HÌNH HỆ THỐNG
 -- ==========================================
-local service = 22491-- Thay bằng Service ID của bạn trên PlatoBoost
-local secret = "eb9b9028-8b83-4ee1-9d1a-119dc1a54ada" -- Thay bằng Secret Key trên PlatoBoost
+local service = 22491
+local secret = "eb9b9028-8b83-4ee1-9d1a-119dc1a54ada"
 local useNonce = true
-local mainScriptURL = "https://raw.githubusercontent.com/YourName/YourScript/main/script.lua" -- Link script chính của bạn
+local mainScriptURL = "https://raw.githubusercontent.com/YourName/YourScript/main/script.lua"
 
 -- ==========================================
 -- CÁC HÀM XỬ LÝ DỮ LIỆU & MÃ HÓA
@@ -20,23 +20,21 @@ local function lDecode(str)
 end
 
 local function lDigest(str)
-    -- Sử dụng hàm mã hóa SHA-256 hỗ trợ bởi hầu hết các Executor (Synapse, Krnl, Delta, v.v.)
     local cryptLib = crypt or (syn and syn.crypt) or nil
     if cryptLib and cryptLib.hash then
         return cryptLib.hash(str, "sha256")
     end
-    -- Trả về chuỗi gốc nếu Executor không hỗ trợ (có thể gây lỗi xác thực hash với PlatoBoost)
     return str 
 end
 
 -------------------------------------------------------------------------------
---! REQUEST SYSTEM (HỆ THỐNG GIAO TIẾP VỚI MÁY CHỦ)
+--! REQUEST SYSTEM
 -------------------------------------------------------------------------------
 local function safeRequest(options)
     local req = request or http_request or syn_request or (http and http.request)
-    if not req then return nil, "Executor not supported (Không hỗ trợ request)" end
+    if not req then return nil, "Executor not supported" end
     local success, response = pcall(function() return req(options) end)
-    return success and response or nil, "Connection Error (Lỗi kết nối)"
+    return success and response or nil, "Connection Error"
 end
 
 local fSetClipboard = setclipboard or toclipboard or function() end
@@ -62,7 +60,7 @@ local function cacheLink()
         local decoded = lDecode(response.Body)
         if decoded.success then return true, decoded.data.url end
     end
-    return false, "Server Unreachable (Không thể tải Link)"
+    return false, "Server Unreachable"
 end
 
 local function redeemKey(key)
@@ -82,36 +80,38 @@ local function redeemKey(key)
         local decoded = lDecode(response.Body)
         if decoded.success and decoded.data.valid then
             if useNonce then
-                -- Kiểm tra Hash để chống bypass
                 if decoded.data.hash == lDigest("true" .. "-" .. nonce .. "-" .. secret) then 
                     return true 
                 end
-                return false, "Hash Mismatch (Phát hiện gian lận)"
+                return false, "Hash Mismatch"
             end
             return true
         end
-        return false, "Invalid Key (Key sai hoặc đã hết hạn)"
+        return false, "Invalid Key"
     end
-    return false, "Connection Error (Lỗi kết nối máy chủ)"
+    return false, "Error Connecting"
 end
 
 -------------------------------------------------------------------------------
---! MODERN UI DESIGN (GIAO DIỆN NGƯỜI DÙNG)
+--! MODERN UI DESIGN
 -------------------------------------------------------------------------------
 local function StartMainScript()
     _G.Longtokaiaishiteru = true 
-    -- Chạy script chính sau khi đã xác thực Key thành công
     local success, err = pcall(function()
         loadstring(game:HttpGet(mainScriptURL))()
     end)
     if not success then
-        warn("Lỗi khi tải Main Script: " .. tostring(err))
+        warn("Lỗi tải Script chính: " .. tostring(err))
     end
 end
 
 local function CreateGUI()
     local target = game:GetService("CoreGui")
-    if target:FindFirstChild("tokai_KeySystem") then target.OYB_KeySystem:Destroy() end
+    
+    -- SỬA LỖI Ở ĐÂY: Kiểm tra đúng tên ScreenGui để xóa bản cũ
+    if target:FindFirstChild("tokai_KeySystem") then 
+        target["tokai_KeySystem"]:Destroy() 
+    end
 
     local sg = Instance.new("ScreenGui", target)
     sg.Name = "tokai_KeySystem"
@@ -123,7 +123,7 @@ local function CreateGUI()
     main.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
     main.BorderSizePixel = 0
     main.Active = true
-    main.Draggable = true -- Cho phép kéo thả GUI
+    main.Draggable = true 
     Instance.new("UICorner", main).CornerRadius = UDim.new(0, 12)
 
     local grad = Instance.new("UIGradient", main)
@@ -131,7 +131,7 @@ local function CreateGUI()
 
     local Title = Instance.new("TextLabel", main)
     Title.Size = UDim2.new(1, 0, 0, 45)
-    Title.Text = "PREMIUM SCRIPT"
+    Title.Text = "TOKAI PREMIUM"
     Title.TextColor3 = Color3.fromRGB(255, 255, 255)
     Title.Font = Enum.Font.GothamBold
     Title.TextSize = 18
@@ -180,10 +180,10 @@ local function CreateGUI()
             Status.Text = "Vui lòng nhập Key!"
             return 
         end
-        Status.Text = "Đang kiểm tra Key..."
+        Status.Text = "Checking..."
         local ok, err = redeemKey(Input.Text)
         if ok then
-            Status.Text = "Thành công! Chúc bạn chơi vui vẻ."
+            Status.Text = "Authorized!"
             Status.TextColor3 = Color3.fromRGB(0, 255, 120)
             task.wait(1)
             sg:Destroy()
@@ -195,14 +195,14 @@ local function CreateGUI()
     end)
 
     GetK.MouseButton1Click:Connect(function()
-        Status.Text = "Đang tạo Link lấy Key..."
+        Status.Text = "Copying Link..."
         local ok, link = cacheLink()
         if ok then 
             fSetClipboard(link)
-            Status.Text = "Đã copy link lấy Key vào Clipboard!"
+            Status.Text = "Link Copied!"
             Status.TextColor3 = Color3.fromRGB(0, 255, 120)
         else 
-            Status.Text = "Lỗi tạo Link lấy Key!" 
+            Status.Text = "Error getting link!" 
             Status.TextColor3 = Color3.fromRGB(255, 80, 80)
         end
     end)

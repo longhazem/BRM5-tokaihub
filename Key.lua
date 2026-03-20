@@ -106,7 +106,7 @@ local function CreateGUI()
 
     local Title = Instance.new("TextLabel", main)
     Title.Size = UDim2.new(1, 0, 0, 45)
-    Title.Text = "Script Name"
+    Title.Text = "Tokaihub"
     Title.TextColor3 = Color3.fromRGB(255, 255, 255)
     Title.Font = Enum.Font.GothamBold; Title.TextSize = 18; Title.BackgroundTransparency = 1
 

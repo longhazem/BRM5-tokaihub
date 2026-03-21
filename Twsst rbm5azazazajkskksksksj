@@ -253,7 +253,7 @@ end
 ------------------------------------------------------------------
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Window = Rayfield:CreateWindow({ 
-    Name = "⚔️🐧 Tokai Hub (Universal 2026)", 
+    Name = "⚔️🐧 Tokai Hub (Universal test)", 
     LoadingTitle = "Executor: " .. identifyexecutor(),
     Theme = "Default" 
 })
@@ -262,7 +262,7 @@ local CombatTab = Window:CreateTab("Combat ⚔️")
 CombatTab:CreateToggle({ Name = "Silent Aim (Hook)", CurrentValue = false, Callback = function(v) silentAimEnabled = v end })
 CombatTab:CreateToggle({ Name = "Silent Hitbox", CurrentValue = false, Callback = function(v) silentEnabled = v end })
 CombatTab:CreateToggle({ Name = "Show Hitbox Visual", CurrentValue = false, Callback = function(v) showHitbox = v end })
-CombatTab:CreateSlider({ Name = "Hitbox Size", Range = {0, 50}, Increment = 1, CurrentValue = 20, Callback = function(v) hitboxSize = v end })
+CombatTab:CreateSlider({ Name = "Hitbox Size", Range = {0, 20}, Increment = 1, CurrentValue = 20, Callback = function(v) hitboxSize = v end })
 
 local FovTab = Window:CreateTab("FOV Settings ⭕")
 FovTab:CreateToggle({ Name = "Show FOV Circle", CurrentValue = true, Callback = function(v) showFovCircle = v end })
@@ -367,4 +367,4 @@ end)
 for _, m in ipairs(Workspace:GetDescendants()) do if m:IsA("Model") and isValidNPC(m) then addNPC(m) end end
 Workspace.DescendantAdded:Connect(function(m) if m:IsA("Model") then task.delay(0.1, function() if isValidNPC(m) then addNPC(m) end end) end end)
 
-print("Tokai Hub Universal Loaded!")
+print("Tokai Hub Universal test Loaded!")

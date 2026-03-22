@@ -1,0 +1,155 @@
+-- ==========================================
+-- TOKAI HUB - KEY SYSTEM (FIREBASE VERSION)
+-- ==========================================
+local HttpService = game:GetService("HttpService")
+local Player = game.Players.LocalPlayer
+local CoreGui = game:GetService("CoreGui")
+
+-- CẤU HÌNH FIREBASE CỦA BẠN
+local FIREBASE_URL = "https://keytokai-3ee28-default-rtdb.asia-southeast1.firebasedatabase.app/keys/"
+local MAIN_SCRIPT_URL = "https://raw.githubusercontent.com/longhazem/BRM5-tokaihub/refs/heads/main/BRM5%20tssst"
+
+-- Hàm lấy ID máy (HWID)
+local function getHWID()
+    return tostring(game:GetService("RbxAnalyticsService"):GetClientId())
+end
+
+-- Hàm lấy dữ liệu từ Firebase
+local function checkKeyOnFirebase(enteredKey)
+    local success, response = pcall(function()
+        return HttpService:GetAsync(FIREBASE_URL .. enteredKey .. ".json")
+    end)
+    
+    if not success or response == "null" or response == nil then
+        return false, "Key không tồn tại!"
+    end
+    
+    local data = HttpService:JSONDecode(response)
+    local currentTime = os.time()
+    
+    -- Kiểm tra hết hạn
+    if data.expires_at and currentTime > data.expires_at then
+        return false, "Key đã hết hạn!"
+    end
+    
+    -- Kiểm tra HWID (Chống share key)
+    local myHWID = getHWID()
+    if data.hwid == "none" then
+        -- Key mới: Đăng ký HWID luôn
+        pcall(function()
+            local req = (syn and syn.request) or (http and http.request) or request or http_request
+            if req then
+                req({
+                    Url = FIREBASE_URL .. enteredKey .. ".json",
+                    Method = "PATCH",
+                    Headers = {["Content-Type"] = "application/json"},
+                    Body = HttpService:JSONEncode({hwid = myHWID})
+                })
+            end
+        end)
+        return true, "Success"
+    elseif data.hwid ~= myHWID then
+        return false, "Key đang dùng ở máy khác!"
+    end
+    
+    return true, "Success"
+end
+
+-- Hàm chạy Script chính sau khi vượt qua Key
+local function StartMainScript()
+    local success, scriptContent = pcall(function()
+        return game:HttpGet(MAIN_SCRIPT_URL)
+    end)
+    if success then
+        loadstring(scriptContent)()
+    else
+        warn("Không thể tải Script chính!")
+    end
+end
+
+-- ==========================================
+-- GIAO DIỆN (UI) - GIỮ NGUYÊN STYLE CỦA BẠN
+-- ==========================================
+local sg = Instance.new("ScreenGui", CoreGui)
+sg.Name = "TokaiKeySystem"
+
+local main = Instance.new("Frame", sg)
+main.Size = UDim2.new(0, 320, 0, 180)
+main.Position = UDim2.new(0.5, -160, 0.5, -90)
+main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+main.BorderSizePixel = 0
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
+
+local title = Instance.new("TextLabel", main)
+title.Size = UDim2.new(1, 0, 0, 40)
+title.Text = "TOKAI HUB | KEY SYSTEM"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.BackgroundTransparency = 1
+
+local input = Instance.new("TextBox", main)
+input.Size = UDim2.new(0.85, 0, 0, 35)
+input.Position = UDim2.new(0.075, 0, 0.3, 0)
+input.PlaceholderText = "Nhập Key vào đây..."
+input.Text = ""
+input.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+input.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", input)
+
+local verify = Instance.new("TextButton", main)
+verify.Size = UDim2.new(0.4, 0, 0, 35)
+verify.Position = UDim2.new(0.075, 0, 0.6, 0)
+verify.Text = "XÁC MINH"
+verify.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+verify.TextColor3 = Color3.new(1, 1, 1)
+verify.Font = Enum.Font.GothamBold
+Instance.new("UICorner", verify)
+
+local getK = Instance.new("TextButton", main)
+getK.Size = UDim2.new(0.4, 0, 0, 35)
+getK.Position = UDim2.new(0.525, 0, 0.6, 0)
+getK.Text = "LẤY KEY (Discord)"
+getK.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+getK.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", getK)
+
+local status = Instance.new("TextLabel", main)
+status.Size = UDim2.new(1, 0, 0, 25)
+status.Position = UDim2.new(0, 0, 0.85, 0)
+status.Text = "Đang chờ nhập key..."
+status.TextColor3 = Color3.fromRGB(150, 150, 150)
+status.BackgroundTransparency = 1
+status.TextSize = 12
+
+-- XỬ LÝ SỰ KIỆN
+verify.MouseButton1Click:Connect(function()
+    local key = input.Text:gsub("%s+", "") -- Xóa khoảng trắng thừa
+    if key == "" then
+        status.Text = "Vui lòng không để trống!"
+        return
+    end
+    
+    status.Text = "Đang kiểm tra..."
+    status.TextColor3 = Color3.new(1, 1, 1)
+    
+    task.wait(0.5)
+    local ok, msg = checkKeyOnFirebase(key)
+    
+    if ok then
+        status.Text = "THÀNH CÔNG! ĐANG TẢI..."
+        status.TextColor3 = Color3.fromRGB(0, 255, 127)
+        task.wait(1)
+        sg:Destroy()
+        StartMainScript()
+    else
+        status.Text = "LỖI: " .. msg
+        status.TextColor3 = Color3.fromRGB(255, 80, 80)
+    end
+end)
+
+getK.MouseButton1Click:Connect(function()
+    -- Thay bằng link Discord của bạn
+    setclipboard("https://discord.gg/tokai") 
+    status.Text = "Đã copy link Discord!"
+end)

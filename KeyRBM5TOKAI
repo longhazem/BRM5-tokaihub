@@ -7,7 +7,7 @@ local CoreGui = game:GetService("CoreGui")
 
 -- CẤU HÌNH FIREBASE CỦA BẠN
 local FIREBASE_URL = "https://keytokai-3ee28-default-rtdb.asia-southeast1.firebasedatabase.app/keys/"
-local MAIN_SCRIPT_URL = "https://raw.githubusercontent.com/longhazem/BRM5-tokaihub/refs/heads/main/BRM5%20tssst"
+local MAIN_SCRIPT_URL = "https://raw.githubusercontent.com/longhazem/BRM5-tokaihub/refs/heads/main/Tokaihub%20obf"
 
 -- Hàm lấy ID máy (HWID)
 local function getHWID()
@@ -21,7 +21,7 @@ local function checkKeyOnFirebase(enteredKey)
     end)
     
     if not success or response == "null" or response == nil then
-        return false, "Key không tồn tại!"
+        return false, "The key does not exist.!"
     end
     
     local data = HttpService:JSONDecode(response)
@@ -29,7 +29,7 @@ local function checkKeyOnFirebase(enteredKey)
     
     -- Kiểm tra hết hạn
     if data.expires_at and currentTime > data.expires_at then
-        return false, "Key đã hết hạn!"
+        return false, "Key has expired. !"
     end
     
     -- Kiểm tra HWID (Chống share key)
@@ -63,7 +63,7 @@ local function StartMainScript()
     if success then
         loadstring(scriptContent)()
     else
-        warn("Không thể tải Script chính!")
+        warn("Script cannot be loaded!")
     end
 end
 
@@ -91,7 +91,7 @@ title.BackgroundTransparency = 1
 local input = Instance.new("TextBox", main)
 input.Size = UDim2.new(0.85, 0, 0, 35)
 input.Position = UDim2.new(0.075, 0, 0.3, 0)
-input.PlaceholderText = "Nhập Key vào đây..."
+input.PlaceholderText = "Enter the key here..."
 input.Text = ""
 input.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 input.TextColor3 = Color3.new(1, 1, 1)
@@ -100,7 +100,7 @@ Instance.new("UICorner", input)
 local verify = Instance.new("TextButton", main)
 verify.Size = UDim2.new(0.4, 0, 0, 35)
 verify.Position = UDim2.new(0.075, 0, 0.6, 0)
-verify.Text = "XÁC MINH"
+verify.Text = "verification"
 verify.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
 verify.TextColor3 = Color3.new(1, 1, 1)
 verify.Font = Enum.Font.GothamBold
@@ -109,7 +109,7 @@ Instance.new("UICorner", verify)
 local getK = Instance.new("TextButton", main)
 getK.Size = UDim2.new(0.4, 0, 0, 35)
 getK.Position = UDim2.new(0.525, 0, 0.6, 0)
-getK.Text = "LẤY KEY (Discord)"
+getK.Text = "Get key (Discord)"
 getK.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 getK.TextColor3 = Color3.new(1, 1, 1)
 Instance.new("UICorner", getK)
@@ -117,7 +117,7 @@ Instance.new("UICorner", getK)
 local status = Instance.new("TextLabel", main)
 status.Size = UDim2.new(1, 0, 0, 25)
 status.Position = UDim2.new(0, 0, 0.85, 0)
-status.Text = "Đang chờ nhập key..."
+status.Text = "Waiting for key entry..."
 status.TextColor3 = Color3.fromRGB(150, 150, 150)
 status.BackgroundTransparency = 1
 status.TextSize = 12
@@ -126,30 +126,30 @@ status.TextSize = 12
 verify.MouseButton1Click:Connect(function()
     local key = input.Text:gsub("%s+", "") -- Xóa khoảng trắng thừa
     if key == "" then
-        status.Text = "Vui lòng không để trống!"
+        status.Text = "Please do not leave it blank.!"
         return
     end
     
-    status.Text = "Đang kiểm tra..."
+    status.Text = "currently being checked..."
     status.TextColor3 = Color3.new(1, 1, 1)
     
     task.wait(0.5)
     local ok, msg = checkKeyOnFirebase(key)
     
     if ok then
-        status.Text = "THÀNH CÔNG! ĐANG TẢI..."
+        status.Text = "Success! Loading..."
         status.TextColor3 = Color3.fromRGB(0, 255, 127)
         task.wait(1)
         sg:Destroy()
         StartMainScript()
     else
-        status.Text = "LỖI: " .. msg
+        status.Text = "error: " .. msg
         status.TextColor3 = Color3.fromRGB(255, 80, 80)
     end
 end)
 
 getK.MouseButton1Click:Connect(function()
     -- Thay bằng link Discord của bạn
-    setclipboard("https://discord.gg/tokai") 
-    status.Text = "Đã copy link Discord!"
+    setclipboard("https://discord.gg/nn783R2fK2") 
+    status.Text = "copy Discord!"
 end)

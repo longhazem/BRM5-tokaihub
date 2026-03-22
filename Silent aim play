@@ -6,7 +6,6 @@ local UserInputService = game:GetService('UserInputService')
 local CoreGui = game:GetService('CoreGui')
 
 local Camera = Workspace.CurrentCamera
-local Mouse = LocalPlayer:GetMouse()
 
 -- Cấu hình mặc định
 local Options = {
@@ -15,7 +14,7 @@ local Options = {
     FovRadius = 180
 }
 
--- Khởi tạo vòng FOV (Không có ruột)
+-- Khởi tạo vòng FOV (Rỗng)
 local Drawings = {FovOutline = nil}
 function AddDrawing(Type, Properties)
     local DrawingObject = Drawing.new(Type)
@@ -34,7 +33,6 @@ Drawings.FovOutline = AddDrawing('Circle', {
     Color = Color3.new(1, 1, 1)
 })
 
--- Hàm liên tục cập nhật vị trí và kích thước FOV theo UI
 RunService.RenderStepped:Connect(function()
     if Drawings.FovOutline then
         Drawings.FovOutline.Position = Camera.ViewportSize / 2
@@ -44,175 +42,144 @@ RunService.RenderStepped:Connect(function()
 end)
 
 ---------------------------------------------------------
--- PHẦN TẠO GIAO DIỆN UI (MENU)
+-- UI GIAO DIỆN
 ---------------------------------------------------------
 local ScreenGui = Instance.new("ScreenGui")
--- Cố gắng bỏ vào CoreGui để tránh bị mất khi reset nhân vật
 local success = pcall(function() ScreenGui.Parent = CoreGui end)
 if not success then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 250, 0, 180)
 MainFrame.Position = UDim2.new(0.5, -125, 0.5, -90)
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Parent = ScreenGui
 
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 8)
-UICorner.Parent = MainFrame
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
 
--- Tiêu đề Menu
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Size = UDim2.new(1, 0, 0, 35)
 Title.BackgroundTransparency = 1
-Title.Text = "Silent Aim Menu"
+Title.Text = "Silent Aim (Mobile Fix)"
 Title.TextColor3 = Color3.new(1, 1, 1)
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 16
+Title.TextSize = 14
 Title.Parent = MainFrame
 
--- Nút Bật/Tắt Silent Aim
+-- Nút Bật/Tắt Silent
 local ToggleAimBtn = Instance.new("TextButton")
 ToggleAimBtn.Size = UDim2.new(0.9, 0, 0, 30)
 ToggleAimBtn.Position = UDim2.new(0.05, 0, 0, 40)
-ToggleAimBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+ToggleAimBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
 ToggleAimBtn.Text = "Silent Aim: ON"
 ToggleAimBtn.TextColor3 = Color3.new(1, 1, 1)
 ToggleAimBtn.Font = Enum.Font.GothamSemibold
-ToggleAimBtn.TextSize = 14
-Instance.new("UICorner", ToggleAimBtn).CornerRadius = UDim.new(0, 5)
 ToggleAimBtn.Parent = MainFrame
+Instance.new("UICorner", ToggleAimBtn).CornerRadius = UDim.new(0, 4)
 
 ToggleAimBtn.MouseButton1Click:Connect(function()
     Options.SilentAim = not Options.SilentAim
-    if Options.SilentAim then
-        ToggleAimBtn.Text = "Silent Aim: ON"
-        ToggleAimBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-    else
-        ToggleAimBtn.Text = "Silent Aim: OFF"
-        ToggleAimBtn.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
-    end
+    ToggleAimBtn.Text = Options.SilentAim and "Silent Aim: ON" or "Silent Aim: OFF"
+    ToggleAimBtn.BackgroundColor3 = Options.SilentAim and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(150, 0, 0)
 end)
 
 -- Nút Bật/Tắt FOV
 local ToggleFovBtn = Instance.new("TextButton")
 ToggleFovBtn.Size = UDim2.new(0.9, 0, 0, 30)
-ToggleFovBtn.Position = UDim2.new(0.05, 0, 0, 80)
-ToggleFovBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+ToggleFovBtn.Position = UDim2.new(0.05, 0, 0, 75)
+ToggleFovBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
 ToggleFovBtn.Text = "Show FOV: ON"
 ToggleFovBtn.TextColor3 = Color3.new(1, 1, 1)
 ToggleFovBtn.Font = Enum.Font.GothamSemibold
-ToggleFovBtn.TextSize = 14
-Instance.new("UICorner", ToggleFovBtn).CornerRadius = UDim.new(0, 5)
 ToggleFovBtn.Parent = MainFrame
+Instance.new("UICorner", ToggleFovBtn).CornerRadius = UDim.new(0, 4)
 
 ToggleFovBtn.MouseButton1Click:Connect(function()
     Options.ShowFov = not Options.ShowFov
-    if Options.ShowFov then
-        ToggleFovBtn.Text = "Show FOV: ON"
-        ToggleFovBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-    else
-        ToggleFovBtn.Text = "Show FOV: OFF"
-        ToggleFovBtn.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
-    end
+    ToggleFovBtn.Text = Options.ShowFov and "Show FOV: ON" or "Show FOV: OFF"
+    ToggleFovBtn.BackgroundColor3 = Options.ShowFov and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(150, 0, 0)
 end)
 
--- Thanh Slider điều chỉnh FOV
+-- Slider FOV (Fix Mobile)
 local SliderLabel = Instance.new("TextLabel")
 SliderLabel.Size = UDim2.new(0.9, 0, 0, 20)
-SliderLabel.Position = UDim2.new(0.05, 0, 0, 120)
+SliderLabel.Position = UDim2.new(0.05, 0, 0, 115)
 SliderLabel.BackgroundTransparency = 1
 SliderLabel.Text = "FOV Size: " .. Options.FovRadius
 SliderLabel.TextColor3 = Color3.new(1, 1, 1)
 SliderLabel.Font = Enum.Font.Gotham
-SliderLabel.TextSize = 14
 SliderLabel.Parent = MainFrame
 
 local SliderBG = Instance.new("Frame")
-SliderBG.Size = UDim2.new(0.9, 0, 0, 10)
-SliderBG.Position = UDim2.new(0.05, 0, 0, 145)
-SliderBG.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-Instance.new("UICorner", SliderBG).CornerRadius = UDim.new(1, 0)
+SliderBG.Size = UDim2.new(0.9, 0, 0, 12)
+SliderBG.Position = UDim2.new(0.05, 0, 0, 140)
+SliderBG.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 SliderBG.Parent = MainFrame
+Instance.new("UICorner", SliderBG).CornerRadius = UDim.new(1, 0)
 
 local SliderFill = Instance.new("Frame")
-local defaultPercent = Options.FovRadius / 500 
-SliderFill.Size = UDim2.new(defaultPercent, 0, 1, 0)
-SliderFill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-Instance.new("UICorner", SliderFill).CornerRadius = UDim.new(1, 0)
+SliderFill.Size = UDim2.new(Options.FovRadius / 500, 0, 1, 0)
+SliderFill.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
 SliderFill.Parent = SliderBG
+Instance.new("UICorner", SliderFill).CornerRadius = UDim.new(1, 0)
 
-local SliderBtn = Instance.new("TextButton")
-SliderBtn.Size = UDim2.new(1, 0, 1, 0)
-SliderBtn.BackgroundTransparency = 1
-SliderBtn.Text = ""
-SliderBtn.ZIndex = 10
-SliderBtn.Parent = SliderBG
-
--- Logic kéo Slider đã được sửa đổi cho cực kỳ mượt (sử dụng Mouse)
-local isDraggingSlider = false
-
-local function UpdateSlider()
-    local bgPos = SliderBG.AbsolutePosition.X
-    local bgSize = SliderBG.AbsoluteSize.X
-    local percent = math.clamp((Mouse.X - bgPos) / bgSize, 0, 1)
+-- Logic Slider tối ưu cho Mobile
+local function UpdateSlider(input)
+    local sizeX = math.clamp((input.Position.X - SliderBG.AbsolutePosition.X) / SliderBG.AbsoluteSize.X, 0, 1)
+    SliderFill.Size = UDim2.new(sizeX, 0, 1, 0)
     
-    SliderFill.Size = UDim2.new(percent, 0, 1, 0)
-    local newValue = math.floor(percent * 500) -- FOV Max = 500
-    if newValue < 10 then newValue = 10 end -- FOV Min = 10
-    
-    Options.FovRadius = newValue
-    SliderLabel.Text = "FOV Size: " .. newValue
+    local val = math.floor(sizeX * 500)
+    if val < 5 then val = 5 end
+    Options.FovRadius = val
+    SliderLabel.Text = "FOV Size: " .. val
 end
 
-SliderBtn.MouseButton1Down:Connect(function()
-    isDraggingSlider = true
-    UpdateSlider() -- Cho phép bấm là nhảy tới vị trí chuột luôn
+local isSiding = false
+SliderBG.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        isSiding = true
+        UpdateSlider(input)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if isSiding and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        UpdateSlider(input)
+    end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        isDraggingSlider = false
-    end
-end)
-
-Mouse.Move:Connect(function()
-    if isDraggingSlider then
-        UpdateSlider()
-    end
-end)
-
--- Chức năng kéo thả Menu (Draggable)
-local draggingUI, dragInputUI, dragStartUI, startPosUI
-MainFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        draggingUI = true
-        dragStartUI = input.Position
-        startPosUI = MainFrame.Position
-        
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                draggingUI = false
-            end
-        end)
+        isSiding = false
     end
 end)
-MainFrame.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        dragInputUI = input
+
+-- Draggable Menu
+local dragToggle, dragStart, startPos
+MainFrame.InputBegan:Connect(function(input)
+    if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and not isSiding then
+        dragToggle = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
     end
 end)
+
 UserInputService.InputChanged:Connect(function(input)
-    if input == dragInputUI and draggingUI then
-        local delta = input.Position - dragStartUI
-        MainFrame.Position = UDim2.new(startPosUI.X.Scale, startPosUI.X.Offset + delta.X, startPosUI.Y.Scale, startPosUI.Y.Offset + delta.Y)
+    if dragToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragToggle = false
     end
 end)
 
 ---------------------------------------------------------
--- PHẦN LOGIC SILENT AIM
+-- LOGIC SILENT AIM
 ---------------------------------------------------------
 local Functions = {
     GetClients = filtergc('function', {Name = 'GetClients', Constants = {'Clients'}}, false),
@@ -238,35 +205,28 @@ function GetClosest()
 
     for Player, Data in pairs(ClientService.Clients) do
         if Player == LocalPlayer then continue end
-        
         if not Data.Actor or not Data.Actor.Alive then continue end
         if Data.Squad == ClientService.LocalClient.Squad then continue end
 
         local Position, OnScreen = Camera:WorldToViewportPoint(Data.Actor.Parts.Head.Position)
         if not OnScreen then continue end
 
-        local Center = Camera.ViewportSize / 2
-        local Distance = (Vector2.new(Position.X, Position.Y) - Center).Magnitude
-        
+        local Distance = (Vector2.new(Position.X, Position.Y) - (Camera.ViewportSize / 2)).Magnitude
         if Distance > Options.FovRadius or Distance > ClosestDistance then continue end
 
         ClosestPlayer = Player; ClosestData = Data; ClosestDistance = Distance
     end
-    
-    return ClosestPlayer, ClosestData, ClosestDistance
+    return ClosestPlayer, ClosestData
 end
 
 local OldMuzzle; OldMuzzle = hookfunction(Functions.GetMuzzleCFrame, function(Self, Cast)
     local Origin, Barrel, CameraCF = OldMuzzle(Self, Cast)
-
     if Options.SilentAim and not Cast and Origin then
         local Player, Data = GetClosest()
-        if not Player then return Origin, Barrel, CameraCF end
-        
-        local NewOrigin = CFrame.new(Origin.Position, Data.Actor.Parts.Head.Position)
-        return NewOrigin, Barrel, CameraCF
+        if Player then
+            return CFrame.new(Origin.Position, Data.Actor.Parts.Head.Position), Barrel, CameraCF
+        end
     end
-
     return Origin, Barrel, CameraCF
 end)
 

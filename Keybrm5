@@ -1,0 +1,159 @@
+-- ==========================================
+-- TOKAI HUB - KEY SYSTEM (FIREBASE OPTIMIZED)
+-- ==========================================
+local HttpService = game:GetService("HttpService")
+local Player = game.Players.LocalPlayer
+local CoreGui = game:GetService("CoreGui")
+
+-- CẤU HÌNH FIREBASE
+local FIREBASE_URL = "https://keytokai-3ee28-default-rtdb.asia-southeast1.firebasedatabase.app/keys/"
+local MAIN_SCRIPT_URL = "https://raw.githubusercontent.com/longhazem/BRM5-tokaihub/refs/heads/main/Tokaihub%20obf"
+
+-- Hàm vạn năng để gửi yêu cầu (PATCH/GET)
+local function requestData(url, method, body)
+    local req = (syn and syn.request) or (http and http.request) or request or http_request
+    if req then
+        local response = req({
+            Url = url,
+            Method = method or "GET",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = body and HttpService:JSONEncode(body) or nil
+        })
+        return response.Success, response.Body
+    else
+        -- Fallback cho GetAsync nếu không có hàm request (chỉ dùng được GET)
+        if method == "GET" or not method then
+            local s, b = pcall(function() return HttpService:GetAsync(url) end)
+            return s, b
+        end
+    end
+    return false, "Executor not supported"
+end
+
+local function getHWID()
+    return tostring(game:GetService("RbxAnalyticsService"):GetClientId())
+end
+
+local function checkKeyOnFirebase(enteredKey)
+    enteredKey = enteredKey:gsub("%s+", "") -- Xóa sạch khoảng trắng
+    
+    local success, response = requestData(FIREBASE_URL .. enteredKey .. ".json", "GET")
+    
+    if not success or response == "null" or response == nil or response == "" then
+        return false, "Key does not exist!"
+    end
+    
+    local data = HttpService:JSONDecode(response)
+    local currentTime = os.time()
+    
+    -- 1. Kiểm tra hết hạn
+    if data.expires_at and currentTime > data.expires_at then
+        return false, "Key has expired!"
+    end
+    
+    -- 2. Kiểm tra HWID
+    local myHWID = getHWID()
+    if data.hwid == "none" or data.hwid == nil then
+        -- Key mới: Khóa HWID máy này lại
+        requestData(FIREBASE_URL .. enteredKey .. ".json", "PATCH", {hwid = myHWID})
+        return true, "Authorized!"
+    elseif data.hwid ~= myHWID then
+        return false, "Key is being used on another device!"
+    end
+    
+    return true, "Success"
+end
+
+local function StartMainScript()
+    local success, scriptContent = pcall(function()
+        return game:HttpGet(MAIN_SCRIPT_URL)
+    end)
+    if success then
+        loadstring(scriptContent)()
+    else
+        warn("Main script failed to load!")
+    end
+end
+
+-- ==========================================
+-- GIAO DIỆN (UI)
+-- ==========================================
+local sg = Instance.new("ScreenGui", CoreGui)
+sg.Name = "TokaiKeySystem"
+
+local main = Instance.new("Frame", sg)
+main.Size = UDim2.new(0, 320, 0, 180)
+main.Position = UDim2.new(0.5, -160, 0.5, -90)
+main.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+main.BorderSizePixel = 0
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
+Instance.new("UIStroke", main).Color = Color3.fromRGB(0, 150, 255)
+
+local title = Instance.new("TextLabel", main)
+title.Size = UDim2.new(1, 0, 0, 40)
+title.Text = "TOKAI HUB | PREMIUM"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.BackgroundTransparency = 1
+
+local input = Instance.new("TextBox", main)
+input.Size = UDim2.new(0.85, 0, 0, 35)
+input.Position = UDim2.new(0.075, 0, 0.35, 0)
+input.PlaceholderText = "Paste your Key here..."
+input.Text = ""
+input.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+input.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", input)
+
+local verify = Instance.new("TextButton", main)
+verify.Size = UDim2.new(0.4, 0, 0, 35)
+verify.Position = UDim2.new(0.075, 0, 0.65, 0)
+verify.Text = "VERIFY"
+verify.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+verify.TextColor3 = Color3.new(1, 1, 1)
+verify.Font = Enum.Font.GothamBold
+Instance.new("UICorner", verify)
+
+local getK = Instance.new("TextButton", main)
+getK.Size = UDim2.new(0.4, 0, 0, 35)
+getK.Position = UDim2.new(0.525, 0, 0.65, 0)
+getK.Text = "GET KEY"
+getK.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+getK.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", getK)
+
+local status = Instance.new("TextLabel", main)
+status.Size = UDim2.new(1, 0, 0, 25)
+status.Position = UDim2.new(0, 0, 0.88, 0)
+status.Text = "Awaiting key..."
+status.TextColor3 = Color3.fromRGB(150, 150, 150)
+status.BackgroundTransparency = 1
+status.TextSize = 11
+
+-- XỬ LÝ SỰ KIỆN
+verify.MouseButton1Click:Connect(function()
+    if input.Text == "" then status.Text = "Key cannot be empty!"; return end
+    
+    status.Text = "Checking database..."
+    status.TextColor3 = Color3.new(1, 1, 1)
+    
+    task.wait(0.5)
+    local ok, msg = checkKeyOnFirebase(input.Text)
+    
+    if ok then
+        status.Text = "ACCESS GRANTED!"
+        status.TextColor3 = Color3.fromRGB(0, 255, 127)
+        task.wait(1)
+        sg:Destroy()
+        StartMainScript()
+    else
+        status.Text = "ERROR: " .. msg
+        status.TextColor3 = Color3.fromRGB(255, 80, 80)
+    end
+end)
+
+getK.MouseButton1Click:Connect(function()
+    setclipboard("https://discord.gg/nn783R2fK2") 
+    status.Text = "Discord link copied!"
+end)

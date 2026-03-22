@@ -11,7 +11,7 @@ local Camera = Workspace.CurrentCamera
 local Options = {
     SilentAim = true,
     ShowFov = true,
-    FovRadius = 180
+    FovRadius = 60
 }
 
 -- Khởi tạo vòng FOV (Rỗng)

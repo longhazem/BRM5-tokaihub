@@ -6,6 +6,7 @@ local UserInputService = game:GetService('UserInputService')
 local CoreGui = game:GetService('CoreGui')
 
 local Camera = Workspace.CurrentCamera
+local Mouse = LocalPlayer:GetMouse()
 
 -- Cấu hình mặc định
 local Options = {
@@ -26,7 +27,7 @@ end
 
 Drawings.FovOutline = AddDrawing('Circle', {
     Visible = Options.ShowFov, 
-    Filled = false, -- Không có ruột
+    Filled = false, 
     Position = Camera.ViewportSize / 2, 
     Radius = Options.FovRadius, 
     Thickness = 1.5, 
@@ -46,18 +47,18 @@ end)
 -- PHẦN TẠO GIAO DIỆN UI (MENU)
 ---------------------------------------------------------
 local ScreenGui = Instance.new("ScreenGui")
--- Sử dụng CoreGui để UI không bị reset khi nhân vật chết
+-- Cố gắng bỏ vào CoreGui để tránh bị mất khi reset nhân vật
 local success = pcall(function() ScreenGui.Parent = CoreGui end)
 if not success then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 250, 0, 180)
 MainFrame.Position = UDim2.new(0.5, -125, 0.5, -90)
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
 MainFrame.Parent = ScreenGui
 
--- Bo góc cho Menu
 local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0, 8)
 UICorner.Parent = MainFrame
@@ -137,7 +138,6 @@ Instance.new("UICorner", SliderBG).CornerRadius = UDim.new(1, 0)
 SliderBG.Parent = MainFrame
 
 local SliderFill = Instance.new("Frame")
--- Tính toán độ dài ban đầu (FOV max = 500)
 local defaultPercent = Options.FovRadius / 500 
 SliderFill.Size = UDim2.new(defaultPercent, 0, 1, 0)
 SliderFill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
@@ -148,65 +148,71 @@ local SliderBtn = Instance.new("TextButton")
 SliderBtn.Size = UDim2.new(1, 0, 1, 0)
 SliderBtn.BackgroundTransparency = 1
 SliderBtn.Text = ""
+SliderBtn.ZIndex = 10
 SliderBtn.Parent = SliderBG
 
--- Logic kéo Slider
+-- Logic kéo Slider đã được sửa đổi cho cực kỳ mượt (sử dụng Mouse)
 local isDraggingSlider = false
-SliderBtn.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        isDraggingSlider = true
-    end
+
+local function UpdateSlider()
+    local bgPos = SliderBG.AbsolutePosition.X
+    local bgSize = SliderBG.AbsoluteSize.X
+    local percent = math.clamp((Mouse.X - bgPos) / bgSize, 0, 1)
+    
+    SliderFill.Size = UDim2.new(percent, 0, 1, 0)
+    local newValue = math.floor(percent * 500) -- FOV Max = 500
+    if newValue < 10 then newValue = 10 end -- FOV Min = 10
+    
+    Options.FovRadius = newValue
+    SliderLabel.Text = "FOV Size: " .. newValue
+end
+
+SliderBtn.MouseButton1Down:Connect(function()
+    isDraggingSlider = true
+    UpdateSlider() -- Cho phép bấm là nhảy tới vị trí chuột luôn
 end)
+
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         isDraggingSlider = false
     end
 end)
-UserInputService.InputChanged:Connect(function(input)
-    if isDraggingSlider and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local mousePos = UserInputService:GetMouseLocation().X
-        local bgPos = SliderBG.AbsolutePosition.X
-        local bgSize = SliderBG.AbsoluteSize.X
-        
-        local percent = math.clamp((mousePos - bgPos) / bgSize, 0, 1)
-        SliderFill.Size = UDim2.new(percent, 0, 1, 0)
-        
-        local newValue = math.floor(percent * 500) -- FOV tối đa là 500
-        if newValue < 10 then newValue = 10 end -- Tối thiểu là 10
-        Options.FovRadius = newValue
-        SliderLabel.Text = "FOV Size: " .. newValue
+
+Mouse.Move:Connect(function()
+    if isDraggingSlider then
+        UpdateSlider()
     end
 end)
 
 -- Chức năng kéo thả Menu (Draggable)
-local dragging, dragInput, dragStart, startPos
+local draggingUI, dragInputUI, dragStartUI, startPosUI
 MainFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = MainFrame.Position
+        draggingUI = true
+        dragStartUI = input.Position
+        startPosUI = MainFrame.Position
         
         input.Changed:Connect(function()
             if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
+                draggingUI = false
             end
         end)
     end
 end)
 MainFrame.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
+        dragInputUI = input
     end
 end)
 UserInputService.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        local delta = input.Position - dragStart
-        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    if input == dragInputUI and draggingUI then
+        local delta = input.Position - dragStartUI
+        MainFrame.Position = UDim2.new(startPosUI.X.Scale, startPosUI.X.Offset + delta.X, startPosUI.Y.Scale, startPosUI.Y.Offset + delta.Y)
     end
 end)
 
 ---------------------------------------------------------
--- PHẦN LOGIC SILENT AIM (TỪ CODE GỐC)
+-- PHẦN LOGIC SILENT AIM
 ---------------------------------------------------------
 local Functions = {
     GetClients = filtergc('function', {Name = 'GetClients', Constants = {'Clients'}}, false),
@@ -242,7 +248,6 @@ function GetClosest()
         local Center = Camera.ViewportSize / 2
         local Distance = (Vector2.new(Position.X, Position.Y) - Center).Magnitude
         
-        -- So sánh bằng Options.FovRadius thay vì số cố định
         if Distance > Options.FovRadius or Distance > ClosestDistance then continue end
 
         ClosestPlayer = Player; ClosestData = Data; ClosestDistance = Distance
@@ -254,7 +259,6 @@ end
 local OldMuzzle; OldMuzzle = hookfunction(Functions.GetMuzzleCFrame, function(Self, Cast)
     local Origin, Barrel, CameraCF = OldMuzzle(Self, Cast)
 
-    -- Chỉ kích hoạt Aim nếu Nút Silent Aim đang BẬT (Options.SilentAim == true)
     if Options.SilentAim and not Cast and Origin then
         local Player, Data = GetClosest()
         if not Player then return Origin, Barrel, CameraCF end

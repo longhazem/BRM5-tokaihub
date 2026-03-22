@@ -11,7 +11,8 @@ local Camera = Workspace.CurrentCamera
 local Options = {
     SilentAim = true,
     ShowFov = true,
-    FovRadius = 60
+    FovRadius = 60,
+    ESP = true -- Mặc định bật ESP
 }
 
 -- Khởi tạo vòng FOV (Rỗng)
@@ -42,15 +43,56 @@ RunService.RenderStepped:Connect(function()
 end)
 
 ---------------------------------------------------------
--- UI GIAO DIỆN
+-- LOGIC ESP (NPC "Male")
+---------------------------------------------------------
+local function clearESP()
+    for _, object in pairs(Workspace:GetDescendants()) do
+        if object:IsA("Highlight") and object.Name == "ESP_Visual" then
+            object:Destroy()
+        end
+    end
+end
+
+local function highlightMaleModels()
+    if not Options.ESP then 
+        clearESP()
+        return 
+    end
+
+    for _, object in pairs(Workspace:GetChildren()) do
+        if object:IsA("Model") and object.Name == "Male" then
+            if not object:FindFirstChild("ESP_Visual") then
+                local highlight = Instance.new("Highlight")
+                highlight.Name = "ESP_Visual"
+                highlight.Adornee = object
+                highlight.FillColor = Color3.fromRGB(0, 255, 200)
+                highlight.FillTransparency = 0.5
+                highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                highlight.OutlineTransparency = 0
+                highlight.Parent = object
+            end
+        end
+    end
+end
+
+-- Chạy vòng lặp quét ESP trong luồng riêng
+task.spawn(function()
+    while true do
+        highlightMaleModels()
+        task.wait(5)
+    end
+end)
+
+---------------------------------------------------------
+-- UI GIAO DIỆN (Tối ưu Mobile)
 ---------------------------------------------------------
 local ScreenGui = Instance.new("ScreenGui")
 local success = pcall(function() ScreenGui.Parent = CoreGui end)
 if not success then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 250, 0, 180)
-MainFrame.Position = UDim2.new(0.5, -125, 0.5, -90)
+MainFrame.Size = UDim2.new(0, 250, 0, 220) -- Tăng chiều cao để chứa thêm nút ESP
+MainFrame.Position = UDim2.new(0.5, -125, 0.5, -110)
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
@@ -61,13 +103,13 @@ Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 35)
 Title.BackgroundTransparency = 1
-Title.Text = "Silent Aim (Mobile Fix)"
+Title.Text = "PVP Mobile BY Tokai"
 Title.TextColor3 = Color3.new(1, 1, 1)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 14
 Title.Parent = MainFrame
 
--- Nút Bật/Tắt Silent
+-- Nút Silent Aim
 local ToggleAimBtn = Instance.new("TextButton")
 ToggleAimBtn.Size = UDim2.new(0.9, 0, 0, 30)
 ToggleAimBtn.Position = UDim2.new(0.05, 0, 0, 40)
@@ -84,10 +126,28 @@ ToggleAimBtn.MouseButton1Click:Connect(function()
     ToggleAimBtn.BackgroundColor3 = Options.SilentAim and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(150, 0, 0)
 end)
 
--- Nút Bật/Tắt FOV
+-- Nút ESP
+local ToggleEspBtn = Instance.new("TextButton")
+ToggleEspBtn.Size = UDim2.new(0.9, 0, 0, 30)
+ToggleEspBtn.Position = UDim2.new(0.05, 0, 0, 75)
+ToggleEspBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+ToggleEspBtn.Text = "player ESP: ON"
+ToggleEspBtn.TextColor3 = Color3.new(1, 1, 1)
+ToggleEspBtn.Font = Enum.Font.GothamSemibold
+ToggleEspBtn.Parent = MainFrame
+Instance.new("UICorner", ToggleEspBtn).CornerRadius = UDim.new(0, 4)
+
+ToggleEspBtn.MouseButton1Click:Connect(function()
+    Options.ESP = not Options.ESP
+    ToggleEspBtn.Text = Options.ESP and "NPC ESP: ON" or "NPC ESP: OFF"
+    ToggleEspBtn.BackgroundColor3 = Options.ESP and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(150, 0, 0)
+    if not Options.ESP then clearESP() else highlightMaleModels() end
+end)
+
+-- Nút FOV
 local ToggleFovBtn = Instance.new("TextButton")
 ToggleFovBtn.Size = UDim2.new(0.9, 0, 0, 30)
-ToggleFovBtn.Position = UDim2.new(0.05, 0, 0, 75)
+ToggleFovBtn.Position = UDim2.new(0.05, 0, 0, 110)
 ToggleFovBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
 ToggleFovBtn.Text = "Show FOV: ON"
 ToggleFovBtn.TextColor3 = Color3.new(1, 1, 1)
@@ -101,10 +161,10 @@ ToggleFovBtn.MouseButton1Click:Connect(function()
     ToggleFovBtn.BackgroundColor3 = Options.ShowFov and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(150, 0, 0)
 end)
 
--- Slider FOV (Fix Mobile)
+-- Slider FOV
 local SliderLabel = Instance.new("TextLabel")
 SliderLabel.Size = UDim2.new(0.9, 0, 0, 20)
-SliderLabel.Position = UDim2.new(0.05, 0, 0, 115)
+SliderLabel.Position = UDim2.new(0.05, 0, 0, 150)
 SliderLabel.BackgroundTransparency = 1
 SliderLabel.Text = "FOV Size: " .. Options.FovRadius
 SliderLabel.TextColor3 = Color3.new(1, 1, 1)
@@ -113,7 +173,7 @@ SliderLabel.Parent = MainFrame
 
 local SliderBG = Instance.new("Frame")
 SliderBG.Size = UDim2.new(0.9, 0, 0, 12)
-SliderBG.Position = UDim2.new(0.05, 0, 0, 140)
+SliderBG.Position = UDim2.new(0.05, 0, 0, 175)
 SliderBG.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 SliderBG.Parent = MainFrame
 Instance.new("UICorner", SliderBG).CornerRadius = UDim.new(1, 0)
@@ -124,18 +184,17 @@ SliderFill.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
 SliderFill.Parent = SliderBG
 Instance.new("UICorner", SliderFill).CornerRadius = UDim.new(1, 0)
 
--- Logic Slider tối ưu cho Mobile
+-- Logic Slider (Mobile Fix)
+local isSiding = false
 local function UpdateSlider(input)
     local sizeX = math.clamp((input.Position.X - SliderBG.AbsolutePosition.X) / SliderBG.AbsoluteSize.X, 0, 1)
     SliderFill.Size = UDim2.new(sizeX, 0, 1, 0)
-    
     local val = math.floor(sizeX * 500)
     if val < 5 then val = 5 end
     Options.FovRadius = val
     SliderLabel.Text = "FOV Size: " .. val
 end
 
-local isSiding = false
 SliderBG.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         isSiding = true

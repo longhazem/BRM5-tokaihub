@@ -1,75 +1,65 @@
 -- Cấu hình
 getgenv().WalkSpeedEnabled = true
-getgenv().CustomSpeed = 60 -- Bạn có thể tăng lên 100 nếu muốn cực nhanh
+getgenv().SpeedValue = 60 -- Chỉnh tốc độ ở đây (Mặc định game là 16)
 
-local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
--- Hàm tìm Module Controller
-local function GetCharController()
-    if getloadedmodules then
-        for _, mod in ipairs(getloadedmodules()) do
-            if mod.Name == "CharacterController" then
-                return require(mod)
-            end
-        end
-    end
-    -- Fallback nếu không có getloadedmodules
-    for _, v in pairs(getgc(true)) do
-        if type(v) == "table" and rawget(v, "Update") and rawget(v, "_exhaust") then
+-- Hàm tìm kiếm Module từ script gốc của bạn
+local function findModule(name)
+    for _, v in ipairs(game:GetDescendants()) do
+        if v:IsA("ModuleScript") and v.Name == name then
             return v
         end
     end
     return nil
 end
 
-local CharController = GetCharController()
+-- Lấy CharacterController bằng phương pháp chính xác từ file gốc
+local CharModule = findModule("CharacterController")
+local CharacterController = nil
 
--- Vòng lặp ép tốc độ (Force Speed)
--- Chúng ta dùng Heartbeat để ép giá trị sau khi game đã tính toán xong
-local SpeedLoop
-SpeedLoop = RunService.Heartbeat:Connect(function()
-    if not getgenv().WalkSpeedEnabled then 
-        SpeedLoop:Disconnect()
-        return 
+if CharModule then
+    CharacterController = require(CharModule)
+end
+
+-- Vòng lặp ép tốc độ cực mạnh (Mỗi frame)
+local SpeedConnection
+SpeedConnection = RunService.Stepped:Connect(function()
+    if not getgenv().WalkSpeedEnabled then
+        SpeedConnection:Disconnect()
+        return
     end
 
     pcall(function()
-        local Character = LocalPlayer.Character
-        if Character and Character:FindFirstChild("Humanoid") then
-            -- 1. Ép trực tiếp vào Humanoid
-            Character.Humanoid.WalkSpeed = getgenv().CustomSpeed
+        -- 1. Ép thông qua Humanoid
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("Humanoid") then
+            char.Humanoid.WalkSpeed = getgenv().SpeedValue
+        end
+
+        -- 2. Ép thông qua Module nội bộ của game (Quan trọng nhất)
+        if CharacterController then
+            -- Ép các biến vận tốc
+            CharacterController._speed = getgenv().SpeedValue
+            CharacterController._walkSpeed = getgenv().SpeedValue
+            CharacterController._sprintSpeed = getgenv().SpeedValue * 1.2
             
-            -- 2. Ép vào Module CharacterController của BRM5
-            if CharController then
-                -- Ép các biến nội bộ mà game dùng để kiểm tra
-                CharController._speed = getgenv().CustomSpeed
-                CharController._walkSpeed = getgenv().CustomSpeed
-                CharController._sprintSpeed = getgenv().CustomSpeed
-                
-                -- Ngăn chặn việc bị kiệt sức (Exhaust)
-                if CharController._stamina then
-                    CharController._stamina = 100
-                end
-                if CharController._isExhausted then
-                    CharController._isExhausted = false
-                end
+            -- Ép thể lực để không bao giờ mệt
+            if CharacterController._stamina then
+                CharacterController._stamina = 100
+            end
+            if CharacterController._isExhausted then
+                CharacterController._isExhausted = false
             end
         end
     end)
 end)
 
--- Hook thêm vào hàm Update để chặn các script khác reset tốc độ
-if CharController and not getgenv().OldUpdate then
-    getgenv().OldUpdate = CharController.Update
-    CharController.Update = function(self, ...)
-        local res = getgenv().OldUpdate(self, ...)
-        if getgenv().WalkSpeedEnabled then
-            self._speed = getgenv().CustomSpeed
-        end
-        return res
-    end
+-- Thông báo
+if CharModule then
+    print("✅ Đã tìm thấy CharacterController và kích hoạt Walkspeed!")
+else
+    warn("⚠️ Không tìm thấy module gốc, đang chạy chế độ ép Humanoid dự phòng.")
 end
-
-print("🚀 Đã kích hoạt Ép Tốc Độ! Hãy thử di chuyển xem sao.")

@@ -1,69 +1,75 @@
 -- Cấu hình
 getgenv().WalkSpeedEnabled = true
-getgenv().CustomSpeed = 50 -- Tốc độ bạn muốn
+getgenv().CustomSpeed = 60 -- Bạn có thể tăng lên 100 nếu muốn cực nhanh
 
-local CharControllerClass = nil
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
 
--- 1. Tìm module qua getloadedmodules (Cách an toàn)
-if getloadedmodules then
-    for _, mod in ipairs(getloadedmodules()) do
-        if mod.Name == "CharacterController" then
-            CharControllerClass = require(mod)
-            break
+-- Hàm tìm Module Controller
+local function GetCharController()
+    if getloadedmodules then
+        for _, mod in ipairs(getloadedmodules()) do
+            if mod.Name == "CharacterController" then
+                return require(mod)
+            end
         end
     end
-end
-
--- 2. Tìm module qua getgc (Cách mạnh mẽ nhất nếu cách 1 thất bại)
-if not CharControllerClass and getgc then
+    -- Fallback nếu không có getloadedmodules
     for _, v in pairs(getgc(true)) do
         if type(v) == "table" and rawget(v, "Update") and rawget(v, "_exhaust") then
-            CharControllerClass = v
-            break
+            return v
         end
     end
+    return nil
 end
 
-if CharControllerClass then
-    -- Lưu lại các hàm gốc để không bị lỗi khi execute nhiều lần
-    if not getgenv().OldCharUpdate then
-        getgenv().OldCharUpdate = CharControllerClass.Update
-        getgenv().OldCharExhaust = CharControllerClass._exhaust
+local CharController = GetCharController()
+
+-- Vòng lặp ép tốc độ (Force Speed)
+-- Chúng ta dùng Heartbeat để ép giá trị sau khi game đã tính toán xong
+local SpeedLoop
+SpeedLoop = RunService.Heartbeat:Connect(function()
+    if not getgenv().WalkSpeedEnabled then 
+        SpeedLoop:Disconnect()
+        return 
     end
 
-    -- Ghi đè hàm Update
-    CharControllerClass.Update = function(self, ...)
-        -- Quan trọng: Cho game tính toán mọi thứ trước
-        local result = getgenv().OldCharUpdate(self, ...)
-
-        -- Sau đó ta ép tốc độ của ta vào để game không kịp ghi đè lại
-        if getgenv().WalkSpeedEnabled then
-            -- Tác động trực tiếp vào Humanoid nếu có
-            if self._humanoid then
-                self._humanoid.WalkSpeed = getgenv().CustomSpeed
-            end
+    pcall(function()
+        local Character = LocalPlayer.Character
+        if Character and Character:FindFirstChild("Humanoid") then
+            -- 1. Ép trực tiếp vào Humanoid
+            Character.Humanoid.WalkSpeed = getgenv().CustomSpeed
             
-            -- Tác động vào các biến nội bộ của BRM5
-            self._speed = getgenv().CustomSpeed
-            self._walkSpeed = getgenv().CustomSpeed
-            self._sprintSpeed = getgenv().CustomSpeed * 1.5
-        end
-
-        return result
-    end
-
-    -- Ghi đè hàm Exhaust để có vô hạn thể lực (chạy không mệt)
-    if getgenv().OldCharExhaust then
-        CharControllerClass._exhaust = function(self, ...)
-            if getgenv().WalkSpeedEnabled then
-                -- Bỏ qua việc trừ thể lực
-                return
+            -- 2. Ép vào Module CharacterController của BRM5
+            if CharController then
+                -- Ép các biến nội bộ mà game dùng để kiểm tra
+                CharController._speed = getgenv().CustomSpeed
+                CharController._walkSpeed = getgenv().CustomSpeed
+                CharController._sprintSpeed = getgenv().CustomSpeed
+                
+                -- Ngăn chặn việc bị kiệt sức (Exhaust)
+                if CharController._stamina then
+                    CharController._stamina = 100
+                end
+                if CharController._isExhausted then
+                    CharController._isExhausted = false
+                end
             end
-            return getgenv().OldCharExhaust(self, ...)
         end
-    end
+    end)
+end)
 
-    print("✅ Đã kích hoạt Walkspeed thành công! (Bản nâng cao)")
-else
-    warn("❌ Vẫn không tìm thấy CharacterController! Hãy thử dùng Executor khác mạnh hơn (như Krnl, Synapse, Fluxus, Delta...).")
+-- Hook thêm vào hàm Update để chặn các script khác reset tốc độ
+if CharController and not getgenv().OldUpdate then
+    getgenv().OldUpdate = CharController.Update
+    CharController.Update = function(self, ...)
+        local res = getgenv().OldUpdate(self, ...)
+        if getgenv().WalkSpeedEnabled then
+            self._speed = getgenv().CustomSpeed
+        end
+        return res
+    end
 end
+
+print("🚀 Đã kích hoạt Ép Tốc Độ! Hãy thử di chuyển xem sao.")

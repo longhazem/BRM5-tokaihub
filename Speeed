@@ -1,0 +1,60 @@
+-- Cấu hình tốc độ
+getgenv().EnableWalkspeed = true
+getgenv().CustomWalkSpeed = 50 -- Thay đổi tốc độ mong muốn của bạn ở đây
+
+-- Hàm tìm kiếm module an toàn
+local function findModule(moduleName)
+    -- Tìm trong các module đã load trước
+    for _, obj in ipairs(getloadedmodules()) do
+        if obj.Name == moduleName then
+            return obj
+        end
+    end
+    -- Tìm fallback trong game
+    for _, obj in ipairs(game:GetDescendants()) do
+        if obj:IsA("ModuleScript") and obj.Name == moduleName then
+            return obj
+        end
+    end
+    return nil
+end
+
+-- Bắt đầu Hook vào CharacterController
+local CharModule = findModule("CharacterController")
+
+if CharModule then
+    local CharController = require(CharModule)
+    
+    -- Lưu lại hàm Update gốc để không làm hỏng game hoặc bị phát hiện
+    if not getgenv().OldCharUpdate then
+        getgenv().OldCharUpdate = CharController.Update
+    end
+    
+    -- Ghi đè hàm Update
+    CharController.Update = function(self, ...)
+        if getgenv().EnableWalkspeed then
+            -- BRM5 thường sử dụng các biến nội bộ này để quản lý tốc độ
+            if self._speed then self._speed = getgenv().CustomWalkSpeed end
+            if self._walkSpeed then self._walkSpeed = getgenv().CustomWalkSpeed end
+            
+            -- Tốc độ chạy nhanh (Sprint) bằng 1.5 lần tốc độ đi bộ
+            if self._sprintSpeed then self._sprintSpeed = getgenv().CustomWalkSpeed * 1.5 end
+        end
+        
+        -- Gọi lại hàm gốc để nhân vật vẫn di chuyển bình thường
+        return getgenv().OldCharUpdate(self, ...)
+    end
+    
+    print("✅ Đã kích hoạt Walkspeed thành công! Tốc độ hiện tại: " .. tostring(getgenv().CustomWalkSpeed))
+else
+    warn("❌ Không tìm thấy module CharacterController của BRM5!")
+end
+
+-- Đoạn code hỗ trợ Tắt/Khôi phục lại như cũ (Chạy đoạn này nếu muốn tắt)
+--[[
+if getgenv().OldCharUpdate and CharModule then
+    require(CharModule).Update = getgenv().OldCharUpdate
+    getgenv().OldCharUpdate = nil
+    print("Đã tắt Walkspeed!")
+end
+]]

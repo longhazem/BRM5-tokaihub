@@ -1,679 +1,443 @@
 --[[
-    BRM5 Movement Menu - Standalone
-    Fly + WalkSpeed + Sprint Speed + Infinite Stamina
-    Tách riêng, không cần UI library
-    Phím T = toggle Fly | Phím RightShift = ẩn/hiện menu
+    BRM5 Movement Menu v3
+    Fly dùng BodyVelocity + BodyGyro (không cần hook module)
+    WalkSpeed override liên tục qua Heartbeat
+    T = toggle Fly | RightShift = ẩn/hiện menu
 --]]
 
--- ─── Cleanup instance cũ ──────────────────────────────────────────────────────
+-- ─── Dọn dẹp instance cũ ─────────────────────────────────────────────────────
 if getgenv().BRM5_Move_Cleanup then
     pcall(getgenv().BRM5_Move_Cleanup)
 end
 
 local _conns = {}
-local function addConn(c) table.insert(_conns, c) end
+local function addConn(c) table.insert(_conns, c) return c end
+local _flyObjs = {}
 
 getgenv().BRM5_Move_Cleanup = function()
     for _, c in ipairs(_conns) do pcall(function() c:Disconnect() end) end
     table.clear(_conns)
+    for _, obj in pairs(_flyObjs) do pcall(function() obj:Destroy() end) end
+    table.clear(_flyObjs)
     if getgenv().BRM5_MoveGui then
         pcall(function() getgenv().BRM5_MoveGui:Destroy() end)
         getgenv().BRM5_MoveGui = nil
     end
-    if getgenv().OldMoveCharUpdate then
-        -- restore hook jika ada
-        getgenv().OldMoveCharUpdate = nil
-    end
-    getgenv().BRM5_Move_Settings = nil
+    local lp = game:GetService("Players").LocalPlayer
+    local char = lp and lp.Character
+    local hum  = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then pcall(function() hum.WalkSpeed = 16 end) end
 end
 
--- ─── Services ─────────────────────────────────────────────────────────────────
-local Players        = game:GetService("Players")
-local RunService     = game:GetService("RunService")
+-- ─── Services ────────────────────────────────────────────────────────────────
+local Players          = game:GetService("Players")
+local RunService       = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local TweenService   = game:GetService("TweenService")
-local lp             = Players.LocalPlayer
+local TweenService     = game:GetService("TweenService")
+local lp               = Players.LocalPlayer
 
--- ─── Settings ─────────────────────────────────────────────────────────────────
-local S = {
-    FlyEnabled    = false,
-    FlySpeed      = 50,
-    WalkMult      = 1,
-    SprintMult    = 1,
-    InfStamina    = false,
-}
+-- ─── Settings ────────────────────────────────────────────────────────────────
+local S = { FlyEnabled = false, FlySpeed = 50, WalkMult = 1 }
 getgenv().BRM5_Move_Settings = S
 
--- ─── Helpers ──────────────────────────────────────────────────────────────────
-local Vector3_new = Vector3.new
-local CFrame_new  = CFrame.new
-local camera      = workspace.CurrentCamera
+local BASE_WS = 16
 
+-- ─── Helpers ─────────────────────────────────────────────────────────────────
+local camera = workspace.CurrentCamera
 addConn(workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
     camera = workspace.CurrentCamera
 end))
 
-local _getgc_cache = { t = 0, v = nil }
-local function cached_getgc()
-    local now = tick()
-    if _getgc_cache.v and (now - _getgc_cache.t) < 5 then return _getgc_cache.v end
-    local ok, res = pcall(getgc, true)
-    res = ok and res or {}
-    _getgc_cache.v = res
-    _getgc_cache.t = now
-    return res
+local function getHum()
+    local c = lp and lp.Character
+    return c and c:FindFirstChildOfClass("Humanoid")
+end
+local function getRoot()
+    local c = lp and lp.Character
+    return c and (c:FindFirstChild("HumanoidRootPart") or c.PrimaryPart)
 end
 
-local function findModule(name)
-    local rf = game:GetService("ReplicatedFirst")
-    local RS = game:GetService("ReplicatedStorage")
-    local function search(parent)
-        if not parent then return end
-        for _, child in ipairs(parent:GetChildren()) do
-            if (child.Name:find(name, 1, true) or child.Name:lower():find(name:lower(), 1, true))
-                and child:IsA("ModuleScript") then
-                return child
-            end
-            local found = search(child)
-            if found then return found end
-        end
-    end
-    return search(rf) or search(RS)
-end
-
-local function getActor(self)
-    return self._localActor or self._actor or self._character or self._charActor
-end
-local function getPos(self)
-    return self._position or self._pos or self._charPosition
-end
-local function setPos(self, p)
-    if self._position       ~= nil then self._position       = p end
-    if self._pos            ~= nil then self._pos            = p end
-    if self._charPosition   ~= nil then self._charPosition   = p end
-    if self._lastSafePosition ~= nil then self._lastSafePosition = p end
-    if self._safePosition   ~= nil then self._safePosition   = p end
-end
-local function getWM(self)
-    return self._weightMulti or self._speedMulti or self._moveMulti or self._speedFactor or 1
-end
-local function setWM(self, v)
-    if self._weightMulti ~= nil then self._weightMulti = v end
-    if self._speedMulti  ~= nil then self._speedMulti  = v end
-    if self._moveMulti   ~= nil then self._moveMulti   = v end
-    if self._speedFactor ~= nil then self._speedFactor = v end
-end
-
--- ─── Hook CharacterController ─────────────────────────────────────────────────
-task.spawn(function()
-    local function tryFind()
-        local names = {"CharacterController","CharController","Movement","CharMovement","PlayerMovement","LocomotionController"}
-        for _, name in ipairs(names) do
-            local mod = findModule(name)
-            if mod then
-                local ok, res = pcall(require, mod)
-                if ok and res and (res.Update or res.update) then return res end
-            end
-        end
-        -- GC fallback
-        for _, v in pairs(cached_getgc()) do
-            if type(v) == "table" then
-                local hasUpdate = type(rawget(v,"Update")) == "function"
-                local hasActor  = rawget(v,"_localActor") ~= nil or rawget(v,"_actor") ~= nil
-                local hasPos    = rawget(v,"_position")   ~= nil or rawget(v,"_pos")   ~= nil
-                if hasUpdate and hasActor and hasPos then return v end
-            end
-        end
-    end
-
-    local CC = nil
-    while not CC do
-        task.wait(2)
-        CC = tryFind()
-    end
-
-    -- Lưu original
-    if not getgenv().OldMoveCharUpdate then
-        getgenv().OldMoveCharUpdate = CC.Update or CC.update
-    end
-
-    local function newUpdate(self, inputVector, deltaTime)
-        local actor = getActor(self)
-        if not self or not actor then
-            return getgenv().OldMoveCharUpdate(self, inputVector, deltaTime)
-        end
-
-        -- Infinite Stamina
-        if S.InfStamina then
-            if self._exhaustStart ~= nil then self._exhaustStart = tick() end
-            if self._exhausted    ~= nil then self._exhausted    = tick() + 1 end
-            if self._stamina      ~= nil then self._stamina      = self._maxStamina or self._stamina end
-        end
-
-        -- Speed Multipliers
-        local baseWM = getWM(self)
-        local isSprinting = self.IsSprinting or self._sprinting or self._isSprinting or false
-        local activeMult  = isSprinting and S.SprintMult or S.WalkMult
-        setWM(self, baseWM * activeMult)
-        if self._walkSpeed ~= nil then
-            if self._baseWalkSpeed == nil then self._baseWalkSpeed = self._walkSpeed end
-            self._walkSpeed = self._baseWalkSpeed * S.WalkMult
-        end
-        if self._runSpeed ~= nil then
-            if self._baseRunSpeed == nil then self._baseRunSpeed = self._runSpeed end
-            self._runSpeed = self._baseRunSpeed * S.SprintMult
-        end
-
-        -- Fly
-        if S.FlyEnabled then
-            if self.VelocityGravity ~= nil then self.VelocityGravity = 0 end
-            if self.Gravity         ~= nil then self.Gravity         = 0 end
-            if self._gravity        ~= nil then self._gravity        = 0 end
-            if self.HeightState     ~= nil then self.HeightState     = 0 end
-            if self.IsGrounded      ~= nil then self.IsGrounded      = true end
-            if self._grounded       ~= nil then self._grounded       = true end
-
-            local camCF = camera.CFrame
-            local dir   = Vector3_new(0,0,0)
-            if inputVector.Magnitude > 0 then
-                dir = dir + (camCF.LookVector * -inputVector.Y) + (camCF.RightVector * inputVector.X)
-            end
-            if UserInputService:IsKeyDown(Enum.KeyCode.Space)       then dir = dir + Vector3_new(0,1,0)  end
-            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl)  then dir = dir - Vector3_new(0,1,0)  end
-
-            local curPos = getPos(self)
-            if curPos and dir.Magnitude > 0 then
-                local spd   = tonumber(S.FlySpeed) or 50
-                local boost = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) and 2.5 or 1
-                local nPos  = curPos + (dir.Unit * spd * boost * deltaTime)
-                setPos(self, nPos)
-                if actor.SimulatedPosition ~= nil then actor.SimulatedPosition = nPos end
-                if actor.Position          ~= nil then actor.Position          = nPos end
-                if actor.Grounded          ~= nil then actor.Grounded          = true end
-                if actor.Sprinting         ~= nil then actor.Sprinting         = false end
-            end
-
-            -- CFrame character
-            local char = (actor and (actor.Character or actor._model or actor._char))
-                      or (lp and lp.Character)
-            if char and getPos(self) then
-                local root = char:FindFirstChild("HumanoidRootPart")
-                          or char:FindFirstChild("Root")
-                          or char.PrimaryPart
-                if root then
-                    pcall(function()
-                        root.AssemblyLinearVelocity = Vector3_new(0,0,0)
-                        root.CFrame = CFrame_new(getPos(self), getPos(self) + camCF.LookVector)
-                    end)
-                end
-            end
-
-            setWM(self, baseWM)
-            return
-        end
-
-        local res = getgenv().OldMoveCharUpdate(self, inputVector, deltaTime)
-        setWM(self, baseWM)
-        if self._walkSpeed ~= nil and self._baseWalkSpeed then self._walkSpeed = self._baseWalkSpeed end
-        if self._runSpeed  ~= nil and self._baseRunSpeed  then self._runSpeed  = self._baseRunSpeed  end
-        return res
-    end
-
-    if CC.Update then CC.Update = newUpdate end
-    if CC.update then CC.update = newUpdate end
-
-    -- Exhaust hook
-    if not getgenv().OldMoveCharExhaust then
-        getgenv().OldMoveCharExhaust = CC._exhaust or CC.exhaust
-    end
-    if getgenv().OldMoveCharExhaust then
-        local function newExhaust(self, ...)
-            if S.InfStamina then return true end
-            return getgenv().OldMoveCharExhaust(self, ...)
-        end
-        if CC._exhaust then CC._exhaust = newExhaust end
-        if CC.exhaust  then CC.exhaust  = newExhaust end
-    end
-
-    print("[BRM5 Move] ✓ Hook thành công!")
-end)
-
--- ─── GUI ─────────────────────────────────────────────────────────────────────
-local sg = Instance.new("ScreenGui")
-sg.Name            = "BRM5_MoveMenu"
-sg.ResetOnSpawn    = false
-sg.ZIndexBehavior  = Enum.ZIndexBehavior.Sibling
-sg.IgnoreGuiInset  = true
-sg.Parent          = (gethui and gethui()) or lp:WaitForChild("PlayerGui")
-getgenv().BRM5_MoveGui = sg
-
--- Màu sắc
-local C = {
-    BG      = Color3.fromRGB(15, 15, 20),
-    Header  = Color3.fromRGB(22, 22, 30),
-    Accent  = Color3.fromRGB(80, 140, 255),
-    AccentD = Color3.fromRGB(50, 100, 210),
-    Text    = Color3.fromRGB(220, 220, 230),
-    SubText = Color3.fromRGB(130, 130, 150),
-    ON      = Color3.fromRGB(60, 200, 100),
-    OFF     = Color3.fromRGB(60, 60, 75),
-    Row     = Color3.fromRGB(28, 28, 38),
-    RowH    = Color3.fromRGB(35, 35, 50),
-    Border  = Color3.fromRGB(50, 50, 70),
-}
-
--- Frame chính
-local main = Instance.new("Frame")
-main.Size           = UDim2.new(0, 290, 0, 370)
-main.Position       = UDim2.new(0.5, -145, 0.5, -185)
-main.BackgroundColor3 = C.BG
-main.BorderSizePixel = 0
-main.ClipsDescendants = true
-main.Parent         = sg
-
-Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
-
-local stroke = Instance.new("UIStroke", main)
-stroke.Color     = C.Border
-stroke.Thickness = 1.2
-
--- Shadow
-local shadow = Instance.new("ImageLabel")
-shadow.Size             = UDim2.new(1, 30, 1, 30)
-shadow.Position         = UDim2.new(0, -15, 0, -15)
-shadow.BackgroundTransparency = 1
-shadow.Image            = "rbxassetid://5028857084"
-shadow.ImageColor3      = Color3.fromRGB(0,0,0)
-shadow.ImageTransparency = 0.5
-shadow.ZIndex           = 0
-shadow.Parent           = main
-
--- Header
-local header = Instance.new("Frame")
-header.Size             = UDim2.new(1, 0, 0, 42)
-header.BackgroundColor3 = C.Header
-header.BorderSizePixel  = 0
-header.Parent           = main
-
-Instance.new("UICorner", header).CornerRadius = UDim.new(0, 10)
-
--- Patch bottom corners of header
-local hpatch = Instance.new("Frame")
-hpatch.Size             = UDim2.new(1, 0, 0, 10)
-hpatch.Position         = UDim2.new(0, 0, 1, -10)
-hpatch.BackgroundColor3 = C.Header
-hpatch.BorderSizePixel  = 0
-hpatch.Parent           = header
-
--- Accent line
-local accentLine = Instance.new("Frame")
-accentLine.Size             = UDim2.new(0, 3, 0, 22)
-accentLine.Position         = UDim2.new(0, 12, 0.5, -11)
-accentLine.BackgroundColor3 = C.Accent
-accentLine.BorderSizePixel  = 0
-accentLine.Parent           = header
-Instance.new("UICorner", accentLine).CornerRadius = UDim.new(1, 0)
-
-local title = Instance.new("TextLabel")
-title.Size               = UDim2.new(1, -80, 1, 0)
-title.Position           = UDim2.new(0, 24, 0, 0)
-title.BackgroundTransparency = 1
-title.Text               = "BRM5 Movement"
-title.Font               = Enum.Font.GothamBold
-title.TextSize           = 14
-title.TextColor3         = C.Text
-title.TextXAlignment     = Enum.TextXAlignment.Left
-title.Parent             = header
-
-local subtitle = Instance.new("TextLabel")
-subtitle.Size                = UDim2.new(1, -80, 0, 14)
-subtitle.Position            = UDim2.new(0, 24, 1, -14)
-subtitle.BackgroundTransparency = 1
-subtitle.Text                = "Fly & Speed"
-subtitle.Font                = Enum.Font.Gotham
-subtitle.TextSize            = 11
-subtitle.TextColor3          = C.SubText
-subtitle.TextXAlignment      = Enum.TextXAlignment.Left
-subtitle.Parent              = header
-
--- Close button
-local closeBtn = Instance.new("TextButton")
-closeBtn.Size               = UDim2.new(0, 28, 0, 28)
-closeBtn.Position           = UDim2.new(1, -36, 0.5, -14)
-closeBtn.BackgroundColor3   = Color3.fromRGB(200, 60, 60)
-closeBtn.Text               = "✕"
-closeBtn.Font               = Enum.Font.GothamBold
-closeBtn.TextSize           = 13
-closeBtn.TextColor3         = Color3.fromRGB(255,255,255)
-closeBtn.BorderSizePixel    = 0
-closeBtn.Parent             = header
-Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
-
-closeBtn.MouseButton1Click:Connect(function()
-    TweenService:Create(main, TweenInfo.new(0.2), {Size = UDim2.new(0,290,0,0), Position = UDim2.new(0.5,-145,0.5,0)}):Play()
-    task.wait(0.2)
-    main.Visible = false
-end)
-
--- Scroll content
-local scroll = Instance.new("ScrollingFrame")
-scroll.Size                   = UDim2.new(1, 0, 1, -42)
-scroll.Position               = UDim2.new(0, 0, 0, 42)
-scroll.BackgroundTransparency = 1
-scroll.BorderSizePixel        = 0
-scroll.ScrollBarThickness     = 3
-scroll.ScrollBarImageColor3   = C.Accent
-scroll.CanvasSize             = UDim2.new(0, 0, 0, 0)
-scroll.AutomaticCanvasSize    = Enum.AutomaticSize.Y
-scroll.Parent                 = main
-
-local listLayout = Instance.new("UIListLayout", scroll)
-listLayout.Padding            = UDim.new(0, 0)
-listLayout.SortOrder          = Enum.SortOrder.LayoutOrder
-
-local padding = Instance.new("UIPadding", scroll)
-padding.PaddingLeft   = UDim.new(0, 10)
-padding.PaddingRight  = UDim.new(0, 10)
-padding.PaddingTop    = UDim.new(0, 8)
-padding.PaddingBottom = UDim.new(0, 8)
-
--- ─── Widget builders ──────────────────────────────────────────────────────────
-
-local function SectionLabel(text)
-    local lbl = Instance.new("TextLabel")
-    lbl.Size                 = UDim2.new(1, 0, 0, 24)
-    lbl.BackgroundTransparency = 1
-    lbl.Text                 = text:upper()
-    lbl.Font                 = Enum.Font.GothamBold
-    lbl.TextSize             = 10
-    lbl.TextColor3           = C.Accent
-    lbl.TextXAlignment       = Enum.TextXAlignment.Left
-    lbl.LayoutOrder          = 0
-    lbl.Parent               = scroll
-end
-
-local function Toggle(label, hint, defaultVal, onChange)
-    local state = defaultVal or false
-
-    local row = Instance.new("Frame")
-    row.Size                = UDim2.new(1, 0, 0, 48)
-    row.BackgroundColor3    = C.Row
-    row.BorderSizePixel     = 0
-    row.Parent              = scroll
-    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
-
-    local lbl = Instance.new("TextLabel")
-    lbl.Size                = UDim2.new(1, -60, 0, 20)
-    lbl.Position            = UDim2.new(0, 12, 0, 8)
-    lbl.BackgroundTransparency = 1
-    lbl.Text                = label
-    lbl.Font                = Enum.Font.GothamSemibold
-    lbl.TextSize            = 13
-    lbl.TextColor3          = C.Text
-    lbl.TextXAlignment      = Enum.TextXAlignment.Left
-    lbl.Parent              = row
-
-    if hint then
-        local sub = Instance.new("TextLabel")
-        sub.Size                = UDim2.new(1, -60, 0, 14)
-        sub.Position            = UDim2.new(0, 12, 0, 28)
-        sub.BackgroundTransparency = 1
-        sub.Text                = hint
-        sub.Font                = Enum.Font.Gotham
-        sub.TextSize            = 10
-        sub.TextColor3          = C.SubText
-        sub.TextXAlignment      = Enum.TextXAlignment.Left
-        sub.Parent              = row
-    end
-
-    -- Pill toggle
-    local pill = Instance.new("Frame")
-    pill.Size               = UDim2.new(0, 40, 0, 20)
-    pill.Position           = UDim2.new(1, -52, 0.5, -10)
-    pill.BackgroundColor3   = state and C.ON or C.OFF
-    pill.BorderSizePixel    = 0
-    pill.Parent             = row
-    Instance.new("UICorner", pill).CornerRadius = UDim.new(1, 0)
-
-    local dot = Instance.new("Frame")
-    dot.Size                = UDim2.new(0, 14, 0, 14)
-    dot.Position            = state and UDim2.new(0, 23, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
-    dot.BackgroundColor3    = Color3.fromRGB(255,255,255)
-    dot.BorderSizePixel     = 0
-    dot.Parent              = pill
-    Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
-
-    local function setState(v)
-        state = v
-        TweenService:Create(pill, TweenInfo.new(0.15), {BackgroundColor3 = v and C.ON or C.OFF}):Play()
-        TweenService:Create(dot,  TweenInfo.new(0.15), {Position = v and UDim2.new(0,23,0.5,-7) or UDim2.new(0,3,0.5,-7)}):Play()
-        onChange(v)
-    end
-
-    local btn = Instance.new("TextButton")
-    btn.Size                = UDim2.new(1, 0, 1, 0)
-    btn.BackgroundTransparency = 1
-    btn.Text                = ""
-    btn.Parent              = row
-    btn.MouseButton1Click:Connect(function() setState(not state) end)
-
-    -- Hover
-    btn.MouseEnter:Connect(function()
-        TweenService:Create(row, TweenInfo.new(0.1), {BackgroundColor3 = C.RowH}):Play()
-    end)
-    btn.MouseLeave:Connect(function()
-        TweenService:Create(row, TweenInfo.new(0.1), {BackgroundColor3 = C.Row}):Play()
-    end)
-
-    return setState  -- returns setter so external code can change it
-end
-
-local spacer = Instance.new("Frame")
-spacer.Size               = UDim2.new(1, 0, 0, 4)
-spacer.BackgroundTransparency = 1
-spacer.LayoutOrder        = 0
-
-local function Slider(label, hint, min, max, default, decimals, onChange)
-    local val = default or min
-    decimals  = decimals or 0
-
-    local row = Instance.new("Frame")
-    row.Size                = UDim2.new(1, 0, 0, 60)
-    row.BackgroundColor3    = C.Row
-    row.BorderSizePixel     = 0
-    row.Parent              = scroll
-    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
-
-    local lbl = Instance.new("TextLabel")
-    lbl.Size                = UDim2.new(1, -70, 0, 18)
-    lbl.Position            = UDim2.new(0, 12, 0, 7)
-    lbl.BackgroundTransparency = 1
-    lbl.Text                = label
-    lbl.Font                = Enum.Font.GothamSemibold
-    lbl.TextSize            = 13
-    lbl.TextColor3          = C.Text
-    lbl.TextXAlignment      = Enum.TextXAlignment.Left
-    lbl.Parent              = row
-
-    local valLbl = Instance.new("TextLabel")
-    valLbl.Size             = UDim2.new(0, 55, 0, 18)
-    valLbl.Position         = UDim2.new(1, -65, 0, 7)
-    valLbl.BackgroundTransparency = 1
-    valLbl.Text             = tostring(math.floor(val * 10^decimals) / 10^decimals)
-    valLbl.Font             = Enum.Font.GothamBold
-    valLbl.TextSize         = 13
-    valLbl.TextColor3       = C.Accent
-    valLbl.TextXAlignment   = Enum.TextXAlignment.Right
-    valLbl.Parent           = row
-
-    if hint then
-        local sub = Instance.new("TextLabel")
-        sub.Size                = UDim2.new(1, -12, 0, 13)
-        sub.Position            = UDim2.new(0, 12, 0, 24)
-        sub.BackgroundTransparency = 1
-        sub.Text                = hint
-        sub.Font                = Enum.Font.Gotham
-        sub.TextSize            = 10
-        sub.TextColor3          = C.SubText
-        sub.TextXAlignment      = Enum.TextXAlignment.Left
-        sub.Parent              = row
-    end
-
-    -- Track
-    local track = Instance.new("Frame")
-    track.Size              = UDim2.new(1, -24, 0, 5)
-    track.Position          = UDim2.new(0, 12, 1, -16)
-    track.BackgroundColor3  = C.OFF
-    track.BorderSizePixel   = 0
-    track.Parent            = row
-    Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
-
-    local fill = Instance.new("Frame")
-    fill.Size               = UDim2.new((val - min)/(max - min), 0, 1, 0)
-    fill.BackgroundColor3   = C.Accent
-    fill.BorderSizePixel    = 0
-    fill.Parent             = track
-    Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
-
-    local handle = Instance.new("Frame")
-    handle.Size             = UDim2.new(0, 13, 0, 13)
-    handle.AnchorPoint      = Vector2.new(0.5, 0.5)
-    handle.Position         = UDim2.new((val - min)/(max - min), 0, 0.5, 0)
-    handle.BackgroundColor3 = Color3.fromRGB(255,255,255)
-    handle.BorderSizePixel  = 0
-    handle.Parent           = track
-    Instance.new("UICorner", handle).CornerRadius = UDim.new(1, 0)
-
-    local dragging = false
-
-    local function updateSlider(absX)
-        local trackPos  = track.AbsolutePosition.X
-        local trackSize = track.AbsoluteSize.X
-        local ratio     = math.clamp((absX - trackPos) / trackSize, 0, 1)
-        val = math.floor((min + ratio*(max-min)) * 10^decimals) / 10^decimals
-        local r = (val - min)/(max - min)
-        fill.Size           = UDim2.new(r, 0, 1, 0)
-        handle.Position     = UDim2.new(r, 0, 0.5, 0)
-        valLbl.Text         = tostring(val)
-        onChange(val)
-    end
-
-    local sliderBtn = Instance.new("TextButton")
-    sliderBtn.Size              = UDim2.new(1, 0, 1, 0)
-    sliderBtn.BackgroundTransparency = 1
-    sliderBtn.Text              = ""
-    sliderBtn.Parent            = row
-
-    sliderBtn.MouseButton1Down:Connect(function(x, y)
-        dragging = true
-        updateSlider(x)
-    end)
-
-    addConn(UserInputService.InputChanged:Connect(function(inp)
-        if dragging and inp.UserInputType == Enum.UserInputType.MouseMovement then
-            updateSlider(inp.Position.X)
-        end
-    end))
-
-    addConn(UserInputService.InputEnded:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
-        end
-    end))
-
-    sliderBtn.MouseEnter:Connect(function()
-        TweenService:Create(row, TweenInfo.new(0.1), {BackgroundColor3 = C.RowH}):Play()
-    end)
-    sliderBtn.MouseLeave:Connect(function()
-        TweenService:Create(row, TweenInfo.new(0.1), {BackgroundColor3 = C.Row}):Play()
-    end)
-end
-
-local function Gap()
-    local f = Instance.new("Frame")
-    f.Size                    = UDim2.new(1, 0, 0, 6)
-    f.BackgroundTransparency  = 1
-    f.Parent                  = scroll
-end
-
--- ─── Build UI ─────────────────────────────────────────────────────────────────
-
-SectionLabel("  FLY")
-Gap()
-
-local setFlyToggle = Toggle("Fly", "Phím T để toggle nhanh", false, function(v)
-    S.FlyEnabled = v
-end)
-
-Gap()
-Slider("Fly Speed", "Tốc độ bay (Shift = x2.5)", 10, 500, 50, 0, function(v)
-    S.FlySpeed = v
-end)
-
-Gap()
-SectionLabel("  TỐC ĐỘ")
-Gap()
-
-Slider("WalkSpeed Multiplier", "Nhân tốc độ đi bộ", 1, 20, 1, 1, function(v)
-    S.WalkMult = v
-end)
-
-Gap()
-Slider("Sprint Multiplier", "Nhân tốc độ chạy", 1, 20, 1, 1, function(v)
-    S.SprintMult = v
-end)
-
-Gap()
-SectionLabel("  KHÁC")
-Gap()
-
-Toggle("Infinite Stamina", "Không bao giờ hết stamina", false, function(v)
-    S.InfStamina = v
-end)
-
-Gap()
-
--- ─── Drag ─────────────────────────────────────────────────────────────────────
-do
-    local dragging, dragStart, startPos = false, nil, nil
-    header.InputBegan:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging  = true
-            dragStart = inp.Position
-            startPos  = main.Position
-        end
-    end)
-    addConn(UserInputService.InputChanged:Connect(function(inp)
-        if dragging and inp.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = inp.Position - dragStart
-            main.Position = UDim2.new(
-                startPos.X.Scale, startPos.X.Offset + delta.X,
-                startPos.Y.Scale, startPos.Y.Offset + delta.Y
-            )
-        end
-    end))
-    addConn(UserInputService.InputEnded:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
-        end
-    end))
-end
-
--- ─── Phím tắt ─────────────────────────────────────────────────────────────────
-addConn(UserInputService.InputBegan:Connect(function(inp, typing)
-    if typing then return end
-    -- T = toggle fly
-    if inp.KeyCode == Enum.KeyCode.T then
-        setFlyToggle(not S.FlyEnabled)
-    end
-    -- RightShift = ẩn/hiện menu
-    if inp.KeyCode == Enum.KeyCode.RightShift then
-        main.Visible = not main.Visible
+-- ─── WalkSpeed loop (override liên tục vì BRM5 reset mỗi frame) ─────────────
+addConn(RunService.Heartbeat:Connect(function()
+    if S.FlyEnabled then return end
+    local hum = getHum()
+    if not hum then return end
+    local target = BASE_WS * S.WalkMult
+    if math.abs(hum.WalkSpeed - target) > 0.5 then
+        pcall(function() hum.WalkSpeed = target end)
     end
 end))
 
--- ─── Entrance animation ───────────────────────────────────────────────────────
-main.Size = UDim2.new(0, 290, 0, 0)
-TweenService:Create(main, TweenInfo.new(0.25, Enum.EasingStyle.Back), {Size = UDim2.new(0, 290, 0, 370)}):Play()
+-- ─── Fly System (BodyVelocity + BodyGyro) ────────────────────────────────────
+local bv, bg
 
-print("[BRM5 Move] Menu đã tải! T = Fly | RightShift = ẩn/hiện menu")
+local function createFly(root)
+    if bv then pcall(function() bv:Destroy() end) end
+    if bg then pcall(function() bg:Destroy() end) end
+
+    bv = Instance.new("BodyVelocity")
+    bv.Velocity  = Vector3.new(0,0,0)
+    bv.MaxForce  = Vector3.new(1e5,1e5,1e5)
+    bv.P         = 1e4
+    bv.Parent    = root
+
+    bg = Instance.new("BodyGyro")
+    bg.MaxTorque = Vector3.new(1e5,1e5,1e5)
+    bg.P         = 1e4
+    bg.D         = 500
+    bg.CFrame    = root.CFrame
+    bg.Parent    = root
+
+    _flyObjs.bv = bv
+    _flyObjs.bg = bg
+end
+
+local function destroyFly()
+    if bv then pcall(function() bv:Destroy() end); bv = nil end
+    if bg then pcall(function() bg:Destroy() end); bg = nil end
+    _flyObjs.bv = nil; _flyObjs.bg = nil
+end
+
+addConn(RunService.Heartbeat:Connect(function()
+    if not S.FlyEnabled then return end
+    local root = getRoot()
+    local hum  = getHum()
+    if not root then return end
+
+    if not bv or not bv.Parent then createFly(root) end
+    if not bv then return end
+
+    if hum then
+        pcall(function() hum:ChangeState(Enum.HumanoidStateType.Swimming) end)
+        pcall(function() hum.WalkSpeed = 0 end)
+    end
+
+    local camCF = camera.CFrame
+    local dir   = Vector3.new(0,0,0)
+
+    if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + camCF.LookVector  end
+    if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - camCF.LookVector  end
+    if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - camCF.RightVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + camCF.RightVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.Space)       then dir = dir + Vector3.new(0,1,0) end
+    if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then dir = dir - Vector3.new(0,1,0) end
+
+    local boost = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) and 2.5 or 1
+
+    bv.Velocity = dir.Magnitude > 0 and (dir.Unit * S.FlySpeed * boost) or Vector3.new(0,0,0)
+    bg.CFrame   = CFrame.new(root.Position, root.Position + camCF.LookVector)
+end))
+
+local flyToggleSetter  -- gán sau khi build UI
+
+local function setFly(v)
+    S.FlyEnabled = v
+    if not v then
+        destroyFly()
+        local hum = getHum()
+        if hum then
+            pcall(function()
+                hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+                hum.WalkSpeed = BASE_WS * S.WalkMult
+            end)
+        end
+    end
+    if flyToggleSetter then flyToggleSetter(v) end
+end
+
+addConn(lp.CharacterAdded:Connect(function()
+    S.FlyEnabled = false
+    destroyFly()
+    if flyToggleSetter then flyToggleSetter(false) end
+end))
+
+-- ─── GUI ─────────────────────────────────────────────────────────────────────
+local sg = Instance.new("ScreenGui")
+sg.Name           = "BRM5_MoveMenu"
+sg.ResetOnSpawn   = false
+sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+sg.IgnoreGuiInset = true
+sg.Parent         = (gethui and gethui()) or lp:WaitForChild("PlayerGui")
+getgenv().BRM5_MoveGui = sg
+
+local C = {
+    BG     = Color3.fromRGB(13,13,18),
+    Header = Color3.fromRGB(20,20,28),
+    Accent = Color3.fromRGB(85,145,255),
+    Text   = Color3.fromRGB(220,220,230),
+    Sub    = Color3.fromRGB(115,115,140),
+    ON     = Color3.fromRGB(55,195,95),
+    OFF    = Color3.fromRGB(50,50,68),
+    Row    = Color3.fromRGB(24,24,34),
+    RowH   = Color3.fromRGB(32,32,46),
+    Border = Color3.fromRGB(42,42,62),
+}
+
+local MENU_H = 330
+
+local main = Instance.new("Frame")
+main.Size             = UDim2.new(0,275,0,0)
+main.Position         = UDim2.new(0.5,-137,0.5,-(MENU_H/2))
+main.BackgroundColor3 = C.BG
+main.BorderSizePixel  = 0
+main.ClipsDescendants = true
+main.Parent           = sg
+Instance.new("UICorner",main).CornerRadius = UDim.new(0,10)
+local ms = Instance.new("UIStroke",main); ms.Color=C.Border; ms.Thickness=1.2
+
+-- Header
+local hdr = Instance.new("Frame")
+hdr.Size             = UDim2.new(1,0,0,44)
+hdr.BackgroundColor3 = C.Header
+hdr.BorderSizePixel  = 0
+hdr.Parent           = main
+Instance.new("UICorner",hdr).CornerRadius = UDim.new(0,10)
+local hp = Instance.new("Frame")
+hp.Size=UDim2.new(1,0,0,10); hp.Position=UDim2.new(0,0,1,-10)
+hp.BackgroundColor3=C.Header; hp.BorderSizePixel=0; hp.Parent=hdr
+
+local al = Instance.new("Frame")
+al.Size=UDim2.new(0,3,0,20); al.Position=UDim2.new(0,12,0.5,-10)
+al.BackgroundColor3=C.Accent; al.BorderSizePixel=0; al.Parent=hdr
+Instance.new("UICorner",al).CornerRadius=UDim.new(1,0)
+
+local function lbl(p,txt,sz,font,col,xa,pos,size)
+    local l=Instance.new("TextLabel"); l.Size=size; l.Position=pos
+    l.BackgroundTransparency=1; l.Text=txt; l.Font=font
+    l.TextSize=sz; l.TextColor3=col; l.TextXAlignment=xa; l.Parent=p; return l
+end
+lbl(hdr,"BRM5 Movement",14,Enum.Font.GothamBold,C.Text,
+    Enum.TextXAlignment.Left,UDim2.new(0,22,0,5),UDim2.new(1,-80,0,20))
+lbl(hdr,"Fly + Speed  |  v3",10,Enum.Font.Gotham,C.Sub,
+    Enum.TextXAlignment.Left,UDim2.new(0,22,0,25),UDim2.new(1,-80,0,14))
+
+local xb=Instance.new("TextButton")
+xb.Size=UDim2.new(0,26,0,26); xb.Position=UDim2.new(1,-34,0.5,-13)
+xb.BackgroundColor3=Color3.fromRGB(185,50,50); xb.Text="✕"
+xb.Font=Enum.Font.GothamBold; xb.TextSize=12
+xb.TextColor3=Color3.fromRGB(255,255,255); xb.BorderSizePixel=0; xb.Parent=hdr
+Instance.new("UICorner",xb).CornerRadius=UDim.new(0,6)
+xb.MouseButton1Click:Connect(function()
+    TweenService:Create(main,TweenInfo.new(0.18),{Size=UDim2.new(0,275,0,0)}):Play()
+    task.wait(0.19); main.Visible=false
+end)
+
+-- Scroll
+local sc=Instance.new("ScrollingFrame")
+sc.Size=UDim2.new(1,0,1,-44); sc.Position=UDim2.new(0,0,0,44)
+sc.BackgroundTransparency=1; sc.BorderSizePixel=0
+sc.ScrollBarThickness=3; sc.ScrollBarImageColor3=C.Accent
+sc.AutomaticCanvasSize=Enum.AutomaticSize.Y
+sc.CanvasSize=UDim2.new(0,0,0,0); sc.Parent=main
+local ll=Instance.new("UIListLayout",sc); ll.Padding=UDim.new(0,0)
+local pad=Instance.new("UIPadding",sc)
+pad.PaddingLeft=UDim.new(0,9); pad.PaddingRight=UDim.new(0,9)
+pad.PaddingTop=UDim.new(0,8);  pad.PaddingBottom=UDim.new(0,8)
+
+local function Gap(h)
+    local f=Instance.new("Frame"); f.Size=UDim2.new(1,0,0,h or 5)
+    f.BackgroundTransparency=1; f.Parent=sc
+end
+local function SecLabel(t)
+    local l=Instance.new("TextLabel"); l.Size=UDim2.new(1,0,0,20)
+    l.BackgroundTransparency=1; l.Text=t:upper()
+    l.Font=Enum.Font.GothamBold; l.TextSize=10
+    l.TextColor3=C.Accent; l.TextXAlignment=Enum.TextXAlignment.Left; l.Parent=sc
+end
+
+local function Toggle(label, hint, default, onChange)
+    local state = default or false
+    local h = hint and 50 or 40
+    local row=Instance.new("Frame")
+    row.Size=UDim2.new(1,0,0,h); row.BackgroundColor3=C.Row
+    row.BorderSizePixel=0; row.Parent=sc
+    Instance.new("UICorner",row).CornerRadius=UDim.new(0,8)
+
+    lbl(row,label,13,Enum.Font.GothamSemibold,C.Text,
+        Enum.TextXAlignment.Left,UDim2.new(0,12,0,hint and 7 or 0),
+        UDim2.new(1,-58,0,hint and 20 or h))
+    if hint then lbl(row,hint,10,Enum.Font.Gotham,C.Sub,
+        Enum.TextXAlignment.Left,UDim2.new(0,12,0,27),UDim2.new(1,-58,0,14)) end
+
+    local pill=Instance.new("Frame")
+    pill.Size=UDim2.new(0,38,0,20); pill.Position=UDim2.new(1,-46,0.5,-10)
+    pill.BackgroundColor3=state and C.ON or C.OFF
+    pill.BorderSizePixel=0; pill.Parent=row
+    Instance.new("UICorner",pill).CornerRadius=UDim.new(1,0)
+
+    local dot=Instance.new("Frame")
+    dot.Size=UDim2.new(0,14,0,14); dot.AnchorPoint=Vector2.new(0,0.5)
+    dot.Position=state and UDim2.new(0,21,0.5,0) or UDim2.new(0,3,0.5,0)
+    dot.BackgroundColor3=Color3.fromRGB(255,255,255)
+    dot.BorderSizePixel=0; dot.Parent=pill
+    Instance.new("UICorner",dot).CornerRadius=UDim.new(1,0)
+
+    local function set(v)
+        state=v
+        TweenService:Create(pill,TweenInfo.new(0.13),{BackgroundColor3=v and C.ON or C.OFF}):Play()
+        TweenService:Create(dot,TweenInfo.new(0.13),{Position=v and UDim2.new(0,21,0.5,0) or UDim2.new(0,3,0.5,0)}):Play()
+        onChange(v)
+    end
+
+    local btn=Instance.new("TextButton")
+    btn.Size=UDim2.new(1,0,1,0); btn.BackgroundTransparency=1; btn.Text=""; btn.Parent=row
+    btn.MouseButton1Click:Connect(function() set(not state) end)
+    btn.MouseEnter:Connect(function() TweenService:Create(row,TweenInfo.new(0.1),{BackgroundColor3=C.RowH}):Play() end)
+    btn.MouseLeave:Connect(function() TweenService:Create(row,TweenInfo.new(0.1),{BackgroundColor3=C.Row}):Play() end)
+    return set
+end
+
+local function Slider(label, hint, min, max, default, decimals, onChange)
+    local val=default; decimals=decimals or 0
+    local fmt = decimals>0 and ("%."..decimals.."f") or "%d"
+    local row=Instance.new("Frame")
+    row.Size=UDim2.new(1,0,0,62); row.BackgroundColor3=C.Row
+    row.BorderSizePixel=0; row.Parent=sc
+    Instance.new("UICorner",row).CornerRadius=UDim.new(0,8)
+
+    lbl(row,label,13,Enum.Font.GothamSemibold,C.Text,
+        Enum.TextXAlignment.Left,UDim2.new(0,12,0,7),UDim2.new(1,-72,0,18))
+    local vl=lbl(row,string.format(fmt,val),13,Enum.Font.GothamBold,C.Accent,
+        Enum.TextXAlignment.Right,UDim2.new(1,-66,0,7),UDim2.new(0,56,0,18))
+    if hint then lbl(row,hint,10,Enum.Font.Gotham,C.Sub,
+        Enum.TextXAlignment.Left,UDim2.new(0,12,0,24),UDim2.new(1,-12,0,13)) end
+
+    local trk=Instance.new("Frame")
+    trk.Size=UDim2.new(1,-22,0,5); trk.Position=UDim2.new(0,11,1,-14)
+    trk.BackgroundColor3=C.OFF; trk.BorderSizePixel=0; trk.Parent=row
+    Instance.new("UICorner",trk).CornerRadius=UDim.new(1,0)
+
+    local fill=Instance.new("Frame")
+    fill.Size=UDim2.new((val-min)/(max-min),0,1,0)
+    fill.BackgroundColor3=C.Accent; fill.BorderSizePixel=0; fill.Parent=trk
+    Instance.new("UICorner",fill).CornerRadius=UDim.new(1,0)
+
+    local hdl=Instance.new("Frame")
+    hdl.Size=UDim2.new(0,13,0,13); hdl.AnchorPoint=Vector2.new(0.5,0.5)
+    hdl.Position=UDim2.new((val-min)/(max-min),0,0.5,0)
+    hdl.BackgroundColor3=Color3.fromRGB(255,255,255); hdl.BorderSizePixel=0; hdl.Parent=trk
+    Instance.new("UICorner",hdl).CornerRadius=UDim.new(1,0)
+
+    local drag=false
+    local function upd(ax)
+        local r=math.clamp((ax-trk.AbsolutePosition.X)/trk.AbsoluteSize.X,0,1)
+        val=math.floor((min+r*(max-min))*10^decimals+0.5)/10^decimals
+        local rv=(val-min)/(max-min)
+        fill.Size=UDim2.new(rv,0,1,0); hdl.Position=UDim2.new(rv,0,0.5,0)
+        vl.Text=string.format(fmt,val); onChange(val)
+    end
+    local sb=Instance.new("TextButton")
+    sb.Size=UDim2.new(1,0,1,0); sb.BackgroundTransparency=1; sb.Text=""; sb.Parent=row
+    sb.MouseButton1Down:Connect(function(x) drag=true; upd(x) end)
+    sb.MouseEnter:Connect(function() TweenService:Create(row,TweenInfo.new(0.1),{BackgroundColor3=C.RowH}):Play() end)
+    sb.MouseLeave:Connect(function() TweenService:Create(row,TweenInfo.new(0.1),{BackgroundColor3=C.Row}):Play() end)
+    addConn(UserInputService.InputChanged:Connect(function(i)
+        if drag and i.UserInputType==Enum.UserInputType.MouseMovement then upd(i.Position.X) end
+    end))
+    addConn(UserInputService.InputEnded:Connect(function(i)
+        if i.UserInputType==Enum.UserInputType.MouseButton1 then drag=false end
+    end))
+end
+
+-- ─── Build content ───────────────────────────────────────────────────────────
+SecLabel("  fly")
+Gap()
+
+flyToggleSetter = Toggle("Fly","T = bật/tắt  |  Shift = tăng tốc x2.5",false,function(v)
+    -- gọi setFly nhưng không gọi lại flyToggleSetter (tránh loop)
+    S.FlyEnabled = v
+    if not v then
+        destroyFly()
+        local hum=getHum()
+        if hum then
+            pcall(function()
+                hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+                hum.WalkSpeed=BASE_WS*S.WalkMult
+            end)
+        end
+    end
+end)
+
+Gap()
+Slider("Fly Speed","Tốc độ bay cơ bản",10,500,50,0,function(v) S.FlySpeed=v end)
+Gap(8)
+SecLabel("  tốc độ")
+Gap()
+Slider("WalkSpeed Multiplier","x1 = bình thường, x5 = nhanh hơn 5 lần",1,15,1,1,function(v)
+    S.WalkMult=v
+    if not S.FlyEnabled then
+        local hum=getHum()
+        if hum then pcall(function() hum.WalkSpeed=BASE_WS*v end) end
+    end
+end)
+Gap(8)
+
+-- Info box
+local ir=Instance.new("Frame")
+ir.Size=UDim2.new(1,0,0,70); ir.BackgroundColor3=C.Row
+ir.BorderSizePixel=0; ir.Parent=sc
+Instance.new("UICorner",ir).CornerRadius=UDim.new(0,8)
+local it=Instance.new("TextLabel")
+it.Size=UDim2.new(1,-16,1,0); it.Position=UDim2.new(0,10,0,0)
+it.BackgroundTransparency=1
+it.Text="T → Fly bật/tắt\nRightShift → Ẩn/hiện menu\nWASD + Space/Ctrl khi bay\nShift (khi fly) = tăng tốc x2.5"
+it.Font=Enum.Font.Gotham; it.TextSize=11; it.TextColor3=C.Sub
+it.TextXAlignment=Enum.TextXAlignment.Left
+it.TextYAlignment=Enum.TextYAlignment.Center; it.Parent=ir
+Gap()
+
+-- ─── Drag menu ───────────────────────────────────────────────────────────────
+do
+    local drag,ds,dp=false,nil,nil
+    hdr.InputBegan:Connect(function(i)
+        if i.UserInputType==Enum.UserInputType.MouseButton1 then
+            drag=true; ds=i.Position; dp=main.Position
+        end
+    end)
+    addConn(UserInputService.InputChanged:Connect(function(i)
+        if drag and i.UserInputType==Enum.UserInputType.MouseMovement then
+            local d=i.Position-ds
+            main.Position=UDim2.new(dp.X.Scale,dp.X.Offset+d.X,dp.Y.Scale,dp.Y.Offset+d.Y)
+        end
+    end))
+    addConn(UserInputService.InputEnded:Connect(function(i)
+        if i.UserInputType==Enum.UserInputType.MouseButton1 then drag=false end
+    end))
+end
+
+-- ─── Phím tắt ────────────────────────────────────────────────────────────────
+addConn(UserInputService.InputBegan:Connect(function(inp,typing)
+    if typing then return end
+    if inp.KeyCode==Enum.KeyCode.T then
+        -- Toggle fly
+        local newVal = not S.FlyEnabled
+        flyToggleSetter(newVal)  -- update UI pill
+        -- trigger logic
+        S.FlyEnabled = newVal
+        if not newVal then
+            destroyFly()
+            local hum=getHum()
+            if hum then
+                pcall(function()
+                    hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+                    hum.WalkSpeed=BASE_WS*S.WalkMult
+                end)
+            end
+        end
+    end
+    if inp.KeyCode==Enum.KeyCode.RightShift then
+        if main.Visible then
+            main.Visible=false
+        else
+            main.Visible=true; main.Size=UDim2.new(0,275,0,0)
+            TweenService:Create(main,TweenInfo.new(0.2,Enum.EasingStyle.Back),
+                {Size=UDim2.new(0,275,0,MENU_H)}):Play()
+        end
+    end
+end))
+
+-- ─── Entrance ────────────────────────────────────────────────────────────────
+TweenService:Create(main,TweenInfo.new(0.22,Enum.EasingStyle.Back),
+    {Size=UDim2.new(0,275,0,MENU_H)}):Play()
+
+print("[BRM5 Move v3] Loaded — T=Fly | RightShift=menu")
